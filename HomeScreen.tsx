@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import { fetchMarketplaceListings, MarketplaceListing } from '../api/marketplace';
+import { fetchMarketplaceListings, MarketplaceListing } from './api/marketplace';
 import { colors, radii, shadows, spacing } from '../theme/tokens';
 
 type FeedStatus = 'idle' | 'loading' | 'refreshing' | 'error' | 'success';
