@@ -29,6 +29,8 @@ type ListingCardData = MarketplaceListing & {
   avgRating?: number | string | null;
   cover_image?: string | null;
   coverImage?: string | null;
+  currency?: string | null;
+  price?: number | string | null;
   discounted_price?: number | string | null;
   discountedPrice?: number | string | null;
   farm_logo?: string | null;
@@ -38,7 +40,7 @@ type ListingCardData = MarketplaceListing & {
   final_price?: number | string | null;
   finalPrice?: number | string | null;
   image_url?: string | null;
-  imageUrl?: string | null;  
+  imageUrl?: string | null;
   is_auction?: boolean | number | string | null;
   isAuction?: boolean | number | string | null;
   logo_url?: string | null;
@@ -119,6 +121,8 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
   const [imageFailed, setImageFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
 
+  const listingCurrency = cardListing.currency ?? 'USD';
+  const listingPrice = cardListing.price ?? null;
   const imageUrl = cardListing.coverImage ?? cardListing.cover_image ?? cardListing.imageUrl ?? cardListing.image_url;
   const sellerName =
     cardListing.sellerName ?? cardListing.seller_name ?? cardListing.farmName ?? cardListing.farm_name ?? 'Bettavaro Seller';
@@ -130,7 +134,7 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
     cardListing.logoUrl ??
     cardListing.logo_url;
   const isAuction =
-    cardListing.auctionEnabled ||
+    toBoolean(cardListing.auctionEnabled) ||
     toBoolean(cardListing.auction_enabled) ||
     toBoolean(cardListing.isAuction) ||
     toBoolean(cardListing.is_auction);
@@ -155,11 +159,14 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
   const hasDiscount =
     originalPriceValue !== null && discountedPriceValue !== null && originalPriceValue > discountedPriceValue;
   const price = useMemo(
-    () => formatPrice(hasDiscount && discountedPriceValue !== null ? discountedPriceValue : listing.price, listing.currency),
-    [discountedPriceValue, hasDiscount, listing.currency, listing.price],
+    () =>
+      listingPrice === null
+        ? ''
+        : formatPrice(hasDiscount && discountedPriceValue !== null ? discountedPriceValue : listingPrice, listingCurrency),
+    [discountedPriceValue, hasDiscount, listingCurrency, listingPrice],
   );
   const originalPrice =
-    hasDiscount && originalPriceValue !== null ? formatPrice(originalPriceValue, listing.currency) : null;
+    hasDiscount && originalPriceValue !== null ? formatPrice(originalPriceValue, listingCurrency) : null;
   const discountPercent =
     hasDiscount && originalPriceValue !== null && discountedPriceValue !== null
       ? Math.round(((originalPriceValue - discountedPriceValue) / originalPriceValue) * 100)
@@ -234,7 +241,7 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
           <View style={styles.statusPill}>
             <Text style={styles.statusText}>{statusLabel}</Text>
           </View>
-          <Text style={styles.currency}>{listing.currency.toUpperCase()}</Text>
+          <Text style={styles.currency}>{listingCurrency.toUpperCase()}</Text>
         </View>
 
         <Pressable accessibilityRole="button" style={styles.detailButton} onPress={() => console.log('View listing', listing.id)}>
