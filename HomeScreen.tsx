@@ -162,22 +162,19 @@ const listingPriceFormatted =
     cardListing.priceFormatted ?? null;	
   const listingDescription =
     cardListing.shortDescription ?? cardListing.short_description ?? cardListing.description ?? '';
- const imageUrl =
+ const imageUrl = 
     cardListing.coverImage ??
-    cardListing.cover_image ??
     cardListing.imageUrl ??
     cardListing.image_url ??
+   cardListing.cover_image ??	
     cardListing.cover_image_url ??
-    cardListing.image ??
-    cardListing.thumbnail ??
-    cardListing.thumbnail_url ??
-    cardListing.photo ??
-    cardListing.photo_url ??
-    cardListing.media?.[0]?.url ??
-    cardListing.media?.[0]?.src ??
-    cardListing.images?.[0]?.url ??
-    cardListing.images?.[0]?.src ??
-    null;  
+   null;
+
+  useEffect(() => {
+    if (!hasText(imageUrl)) {
+      console.log('Missing image for listing', cardListing.id, cardListing.title);
+    }
+  }, [cardListing.id, cardListing.title, imageUrl]); 
   const sellerName =
     cardListing.sellerName ?? cardListing.seller_name ?? cardListing.farmName ?? cardListing.farm_name ?? 'Bettavaro Seller';
   const sellerLogo =

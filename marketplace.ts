@@ -13,6 +13,20 @@ type RawSeller = {
   name?: Nullable<string>;
 };
 
+type RawListingMedia = {
+  url?: Nullable<string>;
+  src?: Nullable<string>;
+  storage_path?: Nullable<string>;
+  file_name?: Nullable<string>;
+};
+
+type RawListingImage = {
+  url?: Nullable<string>;
+  src?: Nullable<string>;
+  image_path?: Nullable<string>;
+  image_url?: Nullable<string>;
+};
+
 type RawRating = {
   average?: Nullable<string | number>;
   count?: Nullable<string | number>;
@@ -23,7 +37,19 @@ type RawMarketplaceListing = {
   title?: Nullable<string>;
   slug?: Nullable<string>;
   url?: Nullable<string>;
+   coverImage?: Nullable<string>; 
   cover_image?: Nullable<string>;
+  cover_image_url?: Nullable<string>;
+  imageUrl?: Nullable<string>;
+  image_url?: Nullable<string>;
+  image?: Nullable<string>;
+  thumbnail?: Nullable<string>;
+  thumbnail_url?: Nullable<string>;
+  photo?: Nullable<string>;
+  photo_url?: Nullable<string>;
+  media?: Nullable<RawListingMedia[]>;
+  images?: Nullable<RawListingImage[]>;
+  listing_media?: Nullable<RawListingMedia[]>;
   price?: Nullable<RawPrice>;
   status?: Nullable<string>;
   sale_status?: Nullable<string>;
@@ -55,6 +81,8 @@ export type MarketplaceListing = {
   slug: string | null;
   url: string | null;
   coverImage: string | null;
+ imageUrl: string | null;
+  image_url: string | null; 
   priceFormatted: string;
   priceAmount: number | null;
   priceCurrency: string | null;
@@ -80,6 +108,8 @@ const toTrimmedString = (value: Nullable<string | number>): string | null => {
   return nextValue.length > 0 ? nextValue : null;
 };
 
+const removeDuplicateSlashes = (value: string): string => value.replace(/([^:]\/)\/+/g, '$1');
+
 const normalizeAssetUrl = (value: Nullable<string | number>): string | null => {
   const rawValue = toTrimmedString(value);
 
@@ -87,15 +117,56 @@ const normalizeAssetUrl = (value: Nullable<string | number>): string | null => {
     return null;
   }
 
-  if (/^https?:\/\//i.test(rawValue)) {
-    return rawValue;
+ const normalizedValue = rawValue.replace(/\\+/g, '/');
+
+  if (/^https?:\/\//i.test(normalizedValue)) {
+    return removeDuplicateSlashes(normalizedValue);
   }
 
-  if (rawValue.startsWith('//')) {
-    return `https:${rawValue}`;
+  if (normalizedValue.startsWith('//')) {
+    return removeDuplicateSlashes(`https:${normalizedValue}`);
   }
 
-  return `${MARKETPLACE_ORIGIN}/${rawValue.replace(/^\/+/, '')}`;
+ if (normalizedValue.startsWith('/')) {
+    return removeDuplicateSlashes(`${MARKETPLACE_ORIGIN}${normalizedValue}`);
+  }
+
+  return removeDuplicateSlashes(`${MARKETPLACE_ORIGIN}/${normalizedValue}`);
+};
+
+const pickListingImage = (item: RawMarketplaceListing): string | null => {
+  const candidates: Array<Nullable<string | number>> = [
+    item.coverImage,
+    item.cover_image,
+    item.cover_image_url,
+    item.imageUrl,
+    item.image_url,
+    item.image,
+    item.thumbnail,
+    item.thumbnail_url,
+    item.photo,
+    item.photo_url,
+    item.media?.[0]?.url,
+    item.media?.[0]?.src,
+    item.media?.[0]?.storage_path,
+    item.media?.[0]?.file_name,
+    item.images?.[0]?.url,
+    item.images?.[0]?.src,
+    item.images?.[0]?.image_path,
+    item.images?.[0]?.image_url,
+    item.listing_media?.[0]?.storage_path,
+    item.listing_media?.[0]?.file_name,
+  ];
+
+  for (const candidate of candidates) {
+    const normalizedImage = normalizeAssetUrl(candidate);
+
+    if (normalizedImage !== null) {
+      return normalizedImage;
+    }
+  }
+
+ return null;
 };
 
 const toNumber = (value: Nullable<string | number>): number | null => {
@@ -115,13 +186,17 @@ const toCount = (value: Nullable<string | number>): number => {
 const mapListing = (item: RawMarketplaceListing, index: number): MarketplaceListing => {
   const id = toTrimmedString(item.id) ?? `listing-${index}`;
   const price: RawPrice = item.price ?? {};
+const listingImage = pickListingImage(item);  
 
   return {
+    ...item,	  
     id,
     title: toTrimmedString(item.title) ?? 'Untitled Betta Listing',
     slug: toTrimmedString(item.slug),
     url: toTrimmedString(item.url),
-    coverImage: normalizeAssetUrl(item.cover_image),
+    coverImage: listingImage,
+    imageUrl: listingImage,
+    image_url: listingImage,
     priceFormatted: toTrimmedString(price.formatted) ?? 'Price unavailable',
     priceAmount: toNumber(price.amount),
     priceCurrency: toTrimmedString(price.currency),
