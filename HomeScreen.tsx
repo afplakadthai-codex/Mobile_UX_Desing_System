@@ -140,7 +140,7 @@ const formatStatus = (status: string) =>
     .trim()
     .replace(/\b\w/g, (character) => character.toUpperCase());
 
-const getInitial = () => 'B';
+
 
 type ListingCardProps = {
   listing: MarketplaceListing;
@@ -150,7 +150,7 @@ type ListingCardProps = {
 function ListingCard({ listing, onViewDetail }: ListingCardProps) {
   const cardListing = listing as ListingCardData;
   const [imageFailed, setImageFailed] = useState(false);
-  const [logoFailed, setLogoFailed] = useState(false);
+
 
   const listingCurrency =
     cardListing.currency ??
@@ -183,25 +183,7 @@ const listingPriceFormatted =
       console.log('Missing image for listing', cardListing.id, cardListing.title);
     }
    }, [cardListing.id, cardListing.title, imageUrl]);
-  const sellerName =
-   cardListing.farmName ??
-    cardListing.farm_name ??
-    cardListing.shopName ??
-    cardListing.shop_name ??
-    cardListing.storeName ??
-    cardListing.store_name ??
-    'Bettavaro Seller';
-  const sellerLogo =
-    cardListing.farmLogo ??
-    cardListing.farm_logo ??
-    cardListing.shopLogo ??
-    cardListing.shop_logo ??
-    cardListing.storeLogo ??
-    cardListing.store_logo ??
-    cardListing.sellerLogo ??
-    cardListing.seller_logo ??	
-    cardListing.logoUrl ??
-    cardListing.logo_url;
+
   const isAuction =
     toBoolean(cardListing.auctionEnabled) ||
     toBoolean(cardListing.auction_enabled) ||
@@ -300,24 +282,7 @@ const listingPriceFormatted =
           </Text>
         </View>
 
-        <View style={styles.sellerRow}>
-          {hasText(sellerLogo) && !logoFailed ? (
-            <Image
-              accessibilityIgnoresInvertColors
-              resizeMode="cover"
-              source={{ uri: sellerLogo }}
-              style={styles.sellerLogo}
-              onError={() => setLogoFailed(true)}
-            />
-          ) : (
-            <View style={styles.sellerInitial}>
-            <Text style={styles.sellerInitialText}>{getInitial()}</Text>   
-            </View>
-          )}
-          <Text numberOfLines={1} style={styles.seller}>
-            {sellerName}
-          </Text>
-        </View>
+ 
 
         <View style={styles.metaRow}>
           <View style={styles.statusPill}>

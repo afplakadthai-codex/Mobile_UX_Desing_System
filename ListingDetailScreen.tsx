@@ -41,46 +41,7 @@ const getString = (listing: ListingRecord, keys: string[]) => {
 };
 
 
-const getNestedString = (listing: ListingRecord, objectKey: string, keys: string[]) => {
-  const value = listing[objectKey];
 
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  return getString(value, keys);
-};
-
-
-
-const getSellerDisplayName = (listing: ListingRecord) => {
-  const sellerName =
-    getString(listing, ['farmName', 'farm_name']) ??
-    getNestedString(listing, 'seller', ['farm_name']) ??
-    getString(listing, ['shopName', 'shop_name']) ??
-    getNestedString(listing, 'seller', ['shop_name']) ??
-    getString(listing, ['storeName', 'store_name']) ??
-    getNestedString(listing, 'seller', ['store_name']) ??
-    getString(listing, ['businessName', 'business_name']) ??
-    getNestedString(listing, 'seller', ['business_name']) ??
-    getString(listing, ['sellerFarmName', 'seller_farm_name']) ??
-    getString(listing, ['sellerShopName', 'seller_shop_name']) ??
-    getString(listing, ['sellerStoreName', 'seller_store_name']); 
-
- return sellerName ?? 'Bettavaro Seller'; 
-};
-
-const getSellerLogo = (listing: ListingRecord) =>
-  getString(listing, ['farmLogo', 'farm_logo']) ??
-  getNestedString(listing, 'seller', ['farm_logo']) ??
-  getString(listing, ['shopLogo', 'shop_logo']) ??
-  getNestedString(listing, 'seller', ['shop_logo']) ??
-  getString(listing, ['storeLogo', 'store_logo']) ??
-  getNestedString(listing, 'seller', ['store_logo']) ??
-  getString(listing, ['sellerLogo', 'seller_logo']) ??
-  getNestedString(listing, 'seller', ['logo', 'logo_url']) ??
-  getString(listing, ['logoUrl', 'logo_url']) ??
-  getNestedString(listing, 'seller', ['avatar_url']);
 
 const toNumber = (value: unknown) => {
   if (value === null || value === undefined || value === '') {
@@ -218,18 +179,14 @@ const formatListingPrice = (listing: ListingRecord, currency: string) => {
 };
 
 
-const getInitial = () => 'B';
 
 export function ListingDetailScreen({ navigation, route }: ListingDetailScreenProps) {
   const [imageFailed, setImageFailed] = useState(false);
-  const [logoFailed, setLogoFailed] = useState(false);
   const listing = useMemo(() => (isRecord(route.params.listing) ? route.params.listing : {}), [route.params.listing]);
 
   const title = getString(listing, ['title', 'name']) ?? `Listing #${route.params.listingId}`;
    const currency = getString(listing, ['priceCurrency', 'currency', 'price_currency']) ?? 'USD';
   const imageUrl = getString(listing, ['coverImage', 'imageUrl', 'image_url', 'cover_image', 'cover_image_url']);
-  const sellerName = getSellerDisplayName(listing);
-  const sellerLogo = getSellerLogo(listing);
   const description =
     getString(listing, ['shortDescription', 'short_description', 'description']) ?? 'No description available yet.';
   const isAuction = getBoolean(listing, ['auctionEnabled', 'auction_enabled', 'isAuction', 'is_auction']);
@@ -300,26 +257,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
             </Text>
           </View>
 
-          <View style={styles.sellerRow}>
-            {hasText(sellerLogo) && !logoFailed ? (
-              <Image
-                accessibilityIgnoresInvertColors
-                resizeMode="cover"
-                source={{ uri: sellerLogo }}
-                style={styles.sellerLogo}
-                onError={() => setLogoFailed(true)}
-              />
-            ) : (
-              <View style={styles.sellerInitial}>
-                <Text style={styles.sellerInitialText}>{getInitial()}</Text>  
-              </View>
-            )}
-            <Text numberOfLines={1} style={styles.sellerName}>
-              {sellerName}
-            </Text>
-          </View>
-
-          <View style={styles.section}>
+            <View style={styles.section}>
             <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.description}>{description}</Text>
           </View>
