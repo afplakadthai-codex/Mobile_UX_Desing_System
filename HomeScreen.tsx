@@ -36,13 +36,21 @@ type ListingCardData = MarketplaceListing & {
   price?: number | string | null;
    priceFormatted?: string | null;
   priceAmount?: number | string | null;
-  priceCurrency?: string | null; 
+  priceCurrency?: string | null;
   discounted_price?: number | string | null;
   discountedPrice?: number | string | null;
   farm_logo?: string | null;
   farm_name?: string | null;
   farmLogo?: string | null;
   farmName?: string | null;
+  shop_logo?: string | null;
+  shop_name?: string | null;
+  shopLogo?: string | null;
+  shopName?: string | null;
+  store_logo?: string | null;
+  store_name?: string | null;
+  storeLogo?: string | null;
+  storeName?: string | null; 
   final_price?: number | string | null;
   finalPrice?: number | string | null;
   basePrice?: number | string | null;
@@ -151,7 +159,7 @@ function ListingCard({ listing, onViewDetail }: ListingCardProps) {
  
   const listingPrice =
    cardListing.price ??
-    cardListing.priceAmount ??  
+    cardListing.priceAmount ??
     cardListing.discountedPrice ??
     cardListing.discounted_price ??
     cardListing.finalPrice ??
@@ -159,10 +167,10 @@ function ListingCard({ listing, onViewDetail }: ListingCardProps) {
 
     null;
 const listingPriceFormatted =
-    cardListing.priceFormatted ?? null;	
+    cardListing.priceFormatted ?? null;
   const listingDescription =
     cardListing.shortDescription ?? cardListing.short_description ?? cardListing.description ?? '';
- const imageUrl = 
+ const imageUrl =
     cardListing.coverImage ??
     cardListing.imageUrl ??
     cardListing.image_url ??
@@ -174,14 +182,25 @@ const listingPriceFormatted =
     if (!hasText(imageUrl)) {
       console.log('Missing image for listing', cardListing.id, cardListing.title);
     }
-  }, [cardListing.id, cardListing.title, imageUrl]); 
+   }, [cardListing.id, cardListing.title, imageUrl]);
   const sellerName =
-    cardListing.sellerName ?? cardListing.seller_name ?? cardListing.farmName ?? cardListing.farm_name ?? 'Bettavaro Seller';
+   cardListing.farmName ??
+    cardListing.farm_name ??
+    cardListing.shopName ??
+    cardListing.shop_name ??
+    cardListing.storeName ??
+    cardListing.store_name ??
+    cardListing.sellerName ??
+    'Bettavaro Seller';
   const sellerLogo =
-    cardListing.sellerLogo ??
-    cardListing.seller_logo ??
     cardListing.farmLogo ??
     cardListing.farm_logo ??
+    cardListing.shopLogo ??
+    cardListing.shop_logo ??
+    cardListing.storeLogo ??
+    cardListing.store_logo ??
+    cardListing.sellerLogo ??
+    cardListing.seller_logo ??	
     cardListing.logoUrl ??
     cardListing.logo_url;
   const isAuction =

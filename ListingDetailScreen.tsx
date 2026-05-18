@@ -40,6 +40,71 @@ const getString = (listing: ListingRecord, keys: string[]) => {
   return null;
 };
 
+
+const getNestedString = (listing: ListingRecord, objectKey: string, keys: string[]) => {
+  const value = listing[objectKey];
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return getString(value, keys);
+};
+
+const isLikelyPersonalName = (value: string) => {
+  const words = value.trim().split(/\s+/);
+
+  if (words.length !== 2) {
+    return false;
+  }
+
+  const hasBusinessSignal = /(farm|farms|shop|store|betta|bettas|aquatic|aquatics|fish|fishes|guppy|guppies|shrimp|koi|ranch|hatchery|market|co\.?|company|llc|inc\.?|ltd\.?|studio|collective|imports|export|aqua|aquarium)/i.test(value);
+  const looksLikeTwoHumanNames = words.every((word) => /^[A-Z][a-z'-]+$/.test(word));
+
+  return looksLikeTwoHumanNames && !hasBusinessSignal;
+};
+
+const getSellerDisplayName = (listing: ListingRecord) => {
+  const sellerName =
+    getString(listing, ['farmName', 'farm_name']) ??
+    getNestedString(listing, 'seller', ['farm_name']) ??
+    getString(listing, ['shopName', 'shop_name']) ??
+    getNestedString(listing, 'seller', ['shop_name']) ??
+    getString(listing, ['storeName', 'store_name']) ??
+    getNestedString(listing, 'seller', ['store_name']) ??
+    getString(listing, ['businessName', 'business_name']) ??
+    getNestedString(listing, 'seller', ['business_name']) ??
+    getString(listing, ['sellerFarmName', 'seller_farm_name']) ??
+    getString(listing, ['sellerShopName', 'seller_shop_name']) ??
+    getString(listing, ['sellerStoreName', 'seller_store_name']) ??
+    getString(listing, ['sellerName']) ??
+    getNestedString(listing, 'seller', ['display_name']);
+
+  if (sellerName !== null) {
+    return sellerName;
+  }
+
+  const fallbackSellerName = getNestedString(listing, 'seller', ['name']);
+
+  if (fallbackSellerName !== null && !isLikelyPersonalName(fallbackSellerName)) {
+    return fallbackSellerName;
+  }
+
+  return 'Bettavaro Seller';
+};
+
+const getSellerLogo = (listing: ListingRecord) =>
+  getString(listing, ['farmLogo', 'farm_logo']) ??
+  getNestedString(listing, 'seller', ['farm_logo']) ??
+  getString(listing, ['shopLogo', 'shop_logo']) ??
+  getNestedString(listing, 'seller', ['shop_logo']) ??
+  getString(listing, ['storeLogo', 'store_logo']) ??
+  getNestedString(listing, 'seller', ['store_logo']) ??
+  getString(listing, ['sellerLogo', 'seller_logo']) ??
+  getNestedString(listing, 'seller', ['logo', 'logo_url']) ??
+  getString(listing, ['logoUrl', 'logo_url']) ??
+  getNestedString(listing, 'seller', ['avatar_url']);
+
 const toNumber = (value: unknown) => {
   if (value === null || value === undefined || value === '') {
     return null;
@@ -150,21 +215,18 @@ const isUnavailablePrice = (price: unknown) => {
 };
 
 const formatListingPrice = (listing: ListingRecord, currency: string) => {
-  const formattedPrice = getString(listing, ['priceFormatted']);
+  const formattedPrice = getString(listing, ['priceFormatted', 'price_formatted']);
 
   if (formattedPrice !== null && formattedPrice !== 'Price unavailable') {
     return formattedPrice;
   }
 
   const rawPrice = getRawPriceValue(listing, [
-    'discountedPrice',
-    'discounted_price',
+    'priceAmount',
+    'price_amount',
     'finalPrice',
     'final_price',
     'price',
-    'basePrice',
-    'base_price',
-    'priceAmount',
   ]);
 
   if (isUnavailablePrice(rawPrice)) {
@@ -188,10 +250,9 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
 
   const title = getString(listing, ['title', 'name']) ?? `Listing #${route.params.listingId}`;
    const currency = getString(listing, ['priceCurrency', 'currency', 'price_currency']) ?? 'USD';
-  const imageUrl = getString(listing, ['coverImage', 'imageUrl', 'image_url', 'cover_image', 'cover_image_url']); 
-  const sellerName =
-    getString(listing, ['sellerName', 'seller_name', 'farmName', 'farm_name', 'seller', 'farm']) ?? 'Bettavaro Seller';
-  const sellerLogo = getString(listing, ['sellerLogo', 'seller_logo', 'farmLogo', 'farm_logo', 'logoUrl', 'logo_url']);
+  const imageUrl = getString(listing, ['coverImage', 'imageUrl', 'image_url', 'cover_image', 'cover_image_url']);
+  const sellerName = getSellerDisplayName(listing);
+  const sellerLogo = getSellerLogo(listing);
   const description =
     getString(listing, ['shortDescription', 'short_description', 'description']) ?? 'No description available yet.';
   const isAuction = getBoolean(listing, ['auctionEnabled', 'auction_enabled', 'isAuction', 'is_auction']);
