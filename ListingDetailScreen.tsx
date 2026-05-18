@@ -27,6 +27,14 @@ const isRecord = (value: unknown): value is ListingRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+const getOptimizedImageUrl = (url?: string | null, width = 900): string | null => {
+  if (!url) return null;
+  if (!/^https?:\/\//i.test(url)) return url;
+
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}w=${width}&q=75`;
+};
+
 
 const getString = (listing: ListingRecord, keys: string[]) => {
   for (const key of keys) {
@@ -187,6 +195,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
   const title = getString(listing, ['title', 'name']) ?? `Listing #${route.params.listingId}`;
    const currency = getString(listing, ['priceCurrency', 'currency', 'price_currency']) ?? 'USD';
   const imageUrl = getString(listing, ['coverImage', 'imageUrl', 'image_url', 'cover_image', 'cover_image_url']);
+  const optimizedImageUrl = getOptimizedImageUrl(imageUrl, 1000);  
   const description =
     getString(listing, ['shortDescription', 'short_description', 'description']) ?? 'No description available yet.';
   const isAuction = getBoolean(listing, ['auctionEnabled', 'auction_enabled', 'isAuction', 'is_auction']);
@@ -219,7 +228,9 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
             <Image
               accessibilityIgnoresInvertColors
               resizeMode="cover"
-              source={{ uri: imageUrl }}
+             resizeMethod="resize"
+              fadeDuration={150}
+              source={{ uri: optimizedImageUrl ?? imageUrl }}
               style={styles.image}
               onError={() => setImageFailed(true)}
             />

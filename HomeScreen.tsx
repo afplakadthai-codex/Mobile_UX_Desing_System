@@ -88,6 +88,14 @@ type ListingCardData = MarketplaceListing & {
 
 const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
+const getOptimizedImageUrl = (url?: string | null, width = 900): string | null => {
+  if (!url) return null;
+  if (!/^https?:\/\//i.test(url)) return url;
+
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}w=${width}&q=75`;
+};
+
 const toNumber = (value: number | string | null | undefined) => {
   if (value === null || value === undefined || value === '') {
     return null;
@@ -177,6 +185,7 @@ const listingPriceFormatted =
    cardListing.cover_image ??	
     cardListing.cover_image_url ??
    null;
+     const optimizedImageUrl = getOptimizedImageUrl(imageUrl, 700);
 
   useEffect(() => {
     if (!hasText(imageUrl)) {
@@ -242,13 +251,16 @@ const listingPriceFormatted =
           <Image
             accessibilityIgnoresInvertColors
             resizeMode="cover"
-            source={{ uri: imageUrl }}
+           resizeMethod="resize"
+            fadeDuration={150}
+            source={{ uri: optimizedImageUrl ?? imageUrl }}   
             style={styles.image}
              onError={(error) => {
               console.log('[IMAGE_LOAD_ERROR]', {
                 id: cardListing.id,
                 title: cardListing.title,
                 imageUrl,
+               optimizedImageUrl,				
                 error: error?.nativeEvent,
               });
               setImageFailed(true);
