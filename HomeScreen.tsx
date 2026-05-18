@@ -183,6 +183,11 @@ const listingPriceFormatted =
       console.log('Missing image for listing', cardListing.id, cardListing.title);
     }
    }, [cardListing.id, cardListing.title, imageUrl]);
+   
+    useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
+
 
   const isAuction =
     toBoolean(cardListing.auctionEnabled) ||
@@ -239,7 +244,15 @@ const listingPriceFormatted =
             resizeMode="cover"
             source={{ uri: imageUrl }}
             style={styles.image}
-            onError={() => setImageFailed(true)}
+             onError={(error) => {
+              console.log('[IMAGE_LOAD_ERROR]', {
+                id: cardListing.id,
+                title: cardListing.title,
+                imageUrl,
+                error: error?.nativeEvent,
+              });
+              setImageFailed(true);
+            }} 
           />
         ) : (
           <View style={styles.imageFallback}>
