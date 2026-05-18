@@ -213,18 +213,6 @@ const pickListingImage = (item: RawMarketplaceListing): string | null => {
   return null;
 };
 
-const isLikelyPersonalName = (value: string) => {
-  const words = value.trim().split(/\s+/);
-
-  if (words.length !== 2) {
-    return false;
-  }
-
-  const hasBusinessSignal = /(farm|farms|shop|store|betta|bettas|aquatic|aquatics|fish|fishes|guppy|guppies|shrimp|koi|ranch|hatchery|market|co\.?|company|llc|inc\.?|ltd\.?|studio|collective|imports|export|aqua|aquarium)/i.test(value);
-  const looksLikeTwoHumanNames = words.every((word) => /^[A-Z][a-z'-]+$/.test(word));
-
-  return looksLikeTwoHumanNames && !hasBusinessSignal;
-};
 
 const pickSellerDisplayName = (item: RawMarketplaceListing): string => {
   const candidates: Array<Nullable<string | number>> = [
@@ -239,7 +227,7 @@ const pickSellerDisplayName = (item: RawMarketplaceListing): string => {
     item.seller_farm_name,
     item.seller_shop_name,
     item.seller_store_name,
-    item.seller?.display_name,
+ 
   ];
 
   for (const candidate of candidates) {
@@ -250,12 +238,7 @@ const pickSellerDisplayName = (item: RawMarketplaceListing): string => {
     }
   }
 
-  const sellerName = toTrimmedString(item.seller?.name);
-
-  if (sellerName !== null && !isLikelyPersonalName(sellerName)) {
-    return sellerName;
-  }
-
+ 
   return 'Bettavaro Seller';
 };
 

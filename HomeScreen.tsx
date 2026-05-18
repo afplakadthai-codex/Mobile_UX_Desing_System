@@ -140,7 +140,7 @@ const formatStatus = (status: string) =>
     .trim()
     .replace(/\b\w/g, (character) => character.toUpperCase());
 
-const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'B';
+const getInitial = () => 'B';
 
 type ListingCardProps = {
   listing: MarketplaceListing;
@@ -190,7 +190,6 @@ const listingPriceFormatted =
     cardListing.shop_name ??
     cardListing.storeName ??
     cardListing.store_name ??
-    cardListing.sellerName ??
     'Bettavaro Seller';
   const sellerLogo =
     cardListing.farmLogo ??
@@ -312,7 +311,7 @@ const listingPriceFormatted =
             />
           ) : (
             <View style={styles.sellerInitial}>
-              <Text style={styles.sellerInitialText}>{getInitial(sellerName)}</Text>
+            <Text style={styles.sellerInitialText}>{getInitial()}</Text>   
             </View>
           )}
           <Text numberOfLines={1} style={styles.seller}>

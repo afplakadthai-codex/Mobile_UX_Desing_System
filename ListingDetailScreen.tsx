@@ -51,18 +51,7 @@ const getNestedString = (listing: ListingRecord, objectKey: string, keys: string
   return getString(value, keys);
 };
 
-const isLikelyPersonalName = (value: string) => {
-  const words = value.trim().split(/\s+/);
 
-  if (words.length !== 2) {
-    return false;
-  }
-
-  const hasBusinessSignal = /(farm|farms|shop|store|betta|bettas|aquatic|aquatics|fish|fishes|guppy|guppies|shrimp|koi|ranch|hatchery|market|co\.?|company|llc|inc\.?|ltd\.?|studio|collective|imports|export|aqua|aquarium)/i.test(value);
-  const looksLikeTwoHumanNames = words.every((word) => /^[A-Z][a-z'-]+$/.test(word));
-
-  return looksLikeTwoHumanNames && !hasBusinessSignal;
-};
 
 const getSellerDisplayName = (listing: ListingRecord) => {
   const sellerName =
@@ -76,21 +65,9 @@ const getSellerDisplayName = (listing: ListingRecord) => {
     getNestedString(listing, 'seller', ['business_name']) ??
     getString(listing, ['sellerFarmName', 'seller_farm_name']) ??
     getString(listing, ['sellerShopName', 'seller_shop_name']) ??
-    getString(listing, ['sellerStoreName', 'seller_store_name']) ??
-    getString(listing, ['sellerName']) ??
-    getNestedString(listing, 'seller', ['display_name']);
+    getString(listing, ['sellerStoreName', 'seller_store_name']); 
 
-  if (sellerName !== null) {
-    return sellerName;
-  }
-
-  const fallbackSellerName = getNestedString(listing, 'seller', ['name']);
-
-  if (fallbackSellerName !== null && !isLikelyPersonalName(fallbackSellerName)) {
-    return fallbackSellerName;
-  }
-
-  return 'Bettavaro Seller';
+ return sellerName ?? 'Bettavaro Seller'; 
 };
 
 const getSellerLogo = (listing: ListingRecord) =>
@@ -241,7 +218,7 @@ const formatListingPrice = (listing: ListingRecord, currency: string) => {
 };
 
 
-const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'B';
+const getInitial = () => 'B';
 
 export function ListingDetailScreen({ navigation, route }: ListingDetailScreenProps) {
   const [imageFailed, setImageFailed] = useState(false);
@@ -334,7 +311,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
               />
             ) : (
               <View style={styles.sellerInitial}>
-                <Text style={styles.sellerInitialText}>{getInitial(sellerName)}</Text>
+                <Text style={styles.sellerInitialText}>{getInitial()}</Text>  
               </View>
             )}
             <Text numberOfLines={1} style={styles.sellerName}>
