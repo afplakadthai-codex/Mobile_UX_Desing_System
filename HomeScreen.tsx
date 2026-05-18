@@ -33,6 +33,9 @@ type ListingCardData = MarketplaceListing & {
   coverImage?: string | null;
   currency?: string | null;
   price?: number | string | null;
+   priceFormatted?: string | null;
+  priceAmount?: number | string | null;
+  priceCurrency?: string | null; 
   discounted_price?: number | string | null;
   discountedPrice?: number | string | null;
   farm_logo?: string | null;
@@ -133,21 +136,30 @@ function ListingCard({ listing, onViewDetail }: ListingCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
 
-  const listingCurrency = cardListing.currency ?? 'USD';
+  const listingCurrency =
+    cardListing.currency ??
+    cardListing.priceCurrency ??
+    'USD';
+ 
   const listingPrice =
+   cardListing.price ??
+    cardListing.priceAmount ??  
     cardListing.discountedPrice ??
     cardListing.discounted_price ??
     cardListing.finalPrice ??
     cardListing.final_price ??
-    cardListing.price ??
-    cardListing.basePrice ??
-    cardListing.base_price ??
-    cardListing.originalPrice ??
-    cardListing.original_price ??
+
     null;
+const listingPriceFormatted =
+    cardListing.priceFormatted ?? null;	
   const listingDescription =
     cardListing.shortDescription ?? cardListing.short_description ?? cardListing.description ?? '';
-  const imageUrl = cardListing.coverImage ?? cardListing.cover_image ?? cardListing.imageUrl ?? cardListing.image_url;
+ const imageUrl =
+    cardListing.coverImage ??
+    cardListing.cover_image ??
+    cardListing.imageUrl ??
+    cardListing.image_url ??
+    null;  
   const sellerName =
     cardListing.sellerName ?? cardListing.seller_name ?? cardListing.farmName ?? cardListing.farm_name ?? 'Bettavaro Seller';
   const sellerLogo =
@@ -183,11 +195,18 @@ function ListingCard({ listing, onViewDetail }: ListingCardProps) {
   const hasDiscount =
     originalPriceValue !== null && discountedPriceValue !== null && originalPriceValue > discountedPriceValue;
   const price = useMemo(
-    () =>
-      listingPrice === null || String(listingPrice).trim() === ''
-        ? 'Contact for price'
-        : formatPrice(hasDiscount && discountedPriceValue !== null ? discountedPriceValue : listingPrice, listingCurrency),
-    [discountedPriceValue, hasDiscount, listingCurrency, listingPrice],
+ () => {
+      if (hasText(listingPriceFormatted)) {
+        return listingPriceFormatted;
+      }
+
+      if (listingPrice !== null && String(listingPrice).trim() !== '') {
+        return formatPrice(listingPrice, listingCurrency);
+      }
+
+      return 'Contact for price';
+    },
+    [listingCurrency, listingPrice, listingPriceFormatted],
   );
   const originalPrice =
     hasDiscount && originalPriceValue !== null ? formatPrice(originalPriceValue, listingCurrency) : null;
