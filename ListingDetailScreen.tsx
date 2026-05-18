@@ -48,6 +48,63 @@ const getString = (listing: ListingRecord, keys: string[]) => {
   return null;
 };
 
+const getNestedString = (listing: ListingRecord, path: string[]) => {
+  let value: unknown = listing;
+
+  for (const key of path) {
+    if (!isRecord(value)) {
+      return null;
+    }
+
+    value = value[key];
+  }
+
+  return hasText(value) ? value.trim() : null;
+};
+
+const getFarmName = (listing: ListingRecord) =>
+  getNestedString(listing, ['seller', 'farm_name']) ??
+  getNestedString(listing, ['seller', 'shop_name']) ??
+  getNestedString(listing, ['seller', 'store_name']) ??
+  getNestedString(listing, ['seller', 'business_name']) ??
+  getString(listing, [
+    'farmName',
+    'sellerFarmName',
+    'shopName',
+    'storeName',
+    'farm_name',
+    'shop_name',
+    'store_name',
+    'business_name',
+    'seller_farm_name',
+    'seller_shop_name',
+    'seller_store_name',
+    'seller_business_name',
+  ]);
+
+const getFarmLogo = (listing: ListingRecord) =>
+  getNestedString(listing, ['seller', 'farm_logo']) ??
+  getNestedString(listing, ['seller', 'farm_logo_path']) ??
+  getNestedString(listing, ['seller', 'shop_logo']) ??
+  getNestedString(listing, ['seller', 'store_logo']) ??
+  getNestedString(listing, ['seller', 'business_logo']) ??
+  getString(listing, [
+    'farmLogo',
+    'sellerFarmLogo',
+    'shopLogo',
+    'storeLogo',
+    'farm_logo',
+    'farm_logo_path',
+    'shop_logo',
+    'store_logo',
+    'business_logo',
+    'seller_farm_logo',
+    'seller_farm_logo_path',
+    'seller_shop_logo',
+    'seller_store_logo',
+    'logo_url',
+  ]);
+
 
 
 
@@ -195,7 +252,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
   const title = getString(listing, ['title', 'name']) ?? `Listing #${route.params.listingId}`;
    const currency = getString(listing, ['priceCurrency', 'currency', 'price_currency']) ?? 'USD';
   const imageUrl = getString(listing, ['coverImage', 'imageUrl', 'image_url', 'cover_image', 'cover_image_url']);
-  const optimizedImageUrl = getOptimizedImageUrl(imageUrl, 1000);  
+ const optimizedImageUrl = getOptimizedImageUrl(imageUrl, 1000);
   const description =
     getString(listing, ['shortDescription', 'short_description', 'description']) ?? 'No description available yet.';
   const isAuction = getBoolean(listing, ['auctionEnabled', 'auction_enabled', 'isAuction', 'is_auction']);
@@ -212,6 +269,8 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
     originalPriceValue !== null && discountedPriceValue !== null && originalPriceValue > discountedPriceValue;
   const currentPrice = formatListingPrice(listing, currency);
   const originalPrice = hasDiscount ? formatPrice(originalPriceValue, currency) : null;
+  const farmName = getFarmName(listing);
+  const farmLogo = getFarmLogo(listing); 
   const basicInfo = [
     ['Species', getString(listing, ['species'])],
     ['Strain', getString(listing, ['strain'])],
@@ -267,6 +326,27 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
                 : 'No reviews yet'}
             </Text>
           </View>
+		  
+         {hasText(farmName) ? (
+            <View style={styles.sellerRow}>
+              {hasText(farmLogo) ? (
+                <Image
+                  accessibilityIgnoresInvertColors
+                  resizeMode="cover"
+                  source={{ uri: farmLogo }}
+                  style={styles.sellerLogo}
+                />
+              ) : (
+                <View style={styles.sellerInitial}>
+                  <Text style={styles.sellerInitialText}>{farmName.trim().charAt(0).toUpperCase()}</Text>
+                </View>
+              )}
+              <Text numberOfLines={1} style={styles.sellerName}>
+                {farmName.trim()}
+              </Text>
+            </View>
+          ) : null}
+		  
 
             <View style={styles.section}>
             <Text style={styles.sectionTitle}>Description</Text>

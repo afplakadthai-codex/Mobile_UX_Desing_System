@@ -43,6 +43,8 @@ type ListingCardData = MarketplaceListing & {
   farm_name?: string | null;
   farmLogo?: string | null;
   farmName?: string | null;
+   sellerFarmLogo?: string | null;
+  sellerFarmName?: string | null;
   shop_logo?: string | null;
   shop_name?: string | null;
   shopLogo?: string | null;
@@ -307,6 +309,25 @@ const listingPriceFormatted =
           </Text>
         </View>
 
+   {hasText(farmName) ? (
+          <View style={styles.sellerRow}>
+            {hasText(farmLogo) ? (
+              <Image
+                accessibilityIgnoresInvertColors
+                resizeMode="cover"
+                source={{ uri: farmLogo }}
+                style={styles.sellerLogo}
+              />
+            ) : (
+              <View style={styles.sellerInitial}>
+                <Text style={styles.sellerInitialText}>{farmName.trim().charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
+            <Text numberOfLines={1} style={styles.seller}>
+              {farmName.trim()}
+            </Text>
+          </View>
+        ) : null}
  
 
         <View style={styles.metaRow}>

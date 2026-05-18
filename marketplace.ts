@@ -11,17 +11,19 @@ type RawPrice = {
 
 type RawSeller = {
   name?: Nullable<string>;
-farm_name?: Nullable<string>;
+  farm_name?: Nullable<string>;
   shop_name?: Nullable<string>;
   store_name?: Nullable<string>;
   business_name?: Nullable<string>;
   display_name?: Nullable<string>;
   logo?: Nullable<string>;
   farm_logo?: Nullable<string>;
+   farm_logo_path?: Nullable<string>; 
   shop_logo?: Nullable<string>;
   store_logo?: Nullable<string>;
+  business_logo?: Nullable<string>;  
   logo_url?: Nullable<string>;
-  avatar_url?: Nullable<string>;  
+  avatar_url?: Nullable<string>;
 };
 
 type RawListingMedia = {
@@ -33,7 +35,7 @@ type RawListingMedia = {
   image_url?: Nullable<string>;
   path?: Nullable<string>;
   full_path?: Nullable<string>;
-  public_url?: Nullable<string>; 
+  public_url?: Nullable<string>;
 };
 
 type RawListingImage = {
@@ -86,11 +88,18 @@ type RawMarketplaceListing = {
   seller_farm_name?: Nullable<string>;
   seller_shop_name?: Nullable<string>;
   seller_store_name?: Nullable<string>;
+   seller_business_name?: Nullable<string>; 
   seller_logo?: Nullable<string>;
   farm_logo?: Nullable<string>;
+  farm_logo_path?: Nullable<string>;  
   shop_logo?: Nullable<string>;
   store_logo?: Nullable<string>;
-  logo_url?: Nullable<string>; 
+  business_logo?: Nullable<string>;
+  seller_farm_logo?: Nullable<string>;
+  seller_farm_logo_path?: Nullable<string>;
+  seller_shop_logo?: Nullable<string>;
+  seller_store_logo?: Nullable<string>;
+  logo_url?: Nullable<string>;
   seller?: Nullable<RawSeller>;
   rating?: Nullable<RawRating>;
   ranking_score?: Nullable<string | number>;
@@ -129,7 +138,13 @@ export type MarketplaceListing = {
   sellerName: string | null;
    sellerLogo: string | null;
   farmName?: string | null;
-  farmLogo?: string | null; 
+  farmLogo?: string | null;
+  sellerFarmName?: string | null;
+  sellerFarmLogo?: string | null;
+  shopName?: string | null;
+  shopLogo?: string | null;
+  storeName?: string | null;
+  storeLogo?: string | null;
   ratingAverage: number | null;
   ratingCount: number;
   rankingScore: number;
@@ -198,7 +213,7 @@ const pickListingFileNameCandidate = (
 
 const collectMediaCandidates = (
   records: Nullable<Array<RawListingMedia | RawListingImage>>,
-   listingId: Nullable<string | number>, 
+   listingId: Nullable<string | number>,
 ): Array<Nullable<string | number>> => {
   if (!Array.isArray(records)) {
     return [];
@@ -208,12 +223,12 @@ const collectMediaCandidates = (
     record.url,
     record.src,
     record.storage_path,
-pickListingFileNameCandidate(listingId, record.file_name),   
+ pickListingFileNameCandidate(listingId, record.file_name), 
     record.image_path,
     record.image_url,
     record.path,
     record.full_path,
-    record.public_url,	
+    record.public_url,
   ]);
 };
 
@@ -231,7 +246,7 @@ const pickListingImage = (item: RawMarketplaceListing): string | null => {
     item.photo_url,
   ...collectMediaCandidates(item.media, item.id),
     ...collectMediaCandidates(item.images, item.id),
-    ...collectMediaCandidates(item.listing_media, item.id),  
+    ...collectMediaCandidates(item.listing_media, item.id),
   ];
 
   for (const candidate of candidates) {
@@ -246,7 +261,7 @@ const pickListingImage = (item: RawMarketplaceListing): string | null => {
 };
 
 
-const pickSellerDisplayName = (item: RawMarketplaceListing): string => {
+const pickFarmName = (item: RawMarketplaceListing): string | null => {
   const candidates: Array<Nullable<string | number>> = [
     item.seller?.farm_name,
     item.seller?.shop_name,
@@ -259,41 +274,47 @@ const pickSellerDisplayName = (item: RawMarketplaceListing): string => {
     item.seller_farm_name,
     item.seller_shop_name,
     item.seller_store_name,
- 
+
+    item.seller_business_name, 
   ];
 
   for (const candidate of candidates) {
-    const sellerName = toTrimmedString(candidate);
+    const farmName = toTrimmedString(candidate);
 
-    if (sellerName !== null) {
-      return sellerName;
+    if (farmName !== null) {
+      return farmName;
     }
   }
 
  
-  return 'Bettavaro Seller';
+  return null;
 };
 
-const pickSellerLogo = (item: RawMarketplaceListing): string | null => {
+const pickFarmLogo = (item: RawMarketplaceListing): string | null => {
   const candidates: Array<Nullable<string | number>> = [
     item.seller?.farm_logo,
+    item.seller?.farm_logo_path,	
     item.seller?.shop_logo,
     item.seller?.store_logo,
-    item.seller?.logo,
-    item.seller?.logo_url,
+  item.seller?.business_logo,
     item.farm_logo,
+   item.farm_logo_path,	
     item.shop_logo,
     item.store_logo,
-    item.seller_logo,
+   item.business_logo,
+    item.seller_farm_logo,
+    item.seller_farm_logo_path,
+    item.seller_shop_logo,
+    item.seller_store_logo,
     item.logo_url,
-    item.seller?.avatar_url,
+
   ];
 
   for (const candidate of candidates) {
-    const sellerLogo = normalizeAssetUrl(candidate);
+   const farmLogo = normalizeAssetUrl(candidate);
 
-    if (sellerLogo !== null) {
-      return sellerLogo;
+   if (farmLogo !== null) {
+      return farmLogo;
     }
   }
 
@@ -320,6 +341,30 @@ const mapListing = (item: RawMarketplaceListing, index: number): MarketplaceList
   const price: RawPrice = item.price ?? {};
   const pickedImage = pickListingImage(item);
   
+  
+  if (!pickedImage) {
+  console.log(
+    '[IMAGE_MISSING]',
+    JSON.stringify(
+      {
+        id: item?.id,
+        title: item?.title,
+        cover_image: item?.cover_image,
+        cover_image_url: item?.cover_image_url,
+        image_url: item?.image_url,
+        image: item?.image,
+        thumbnail: item?.thumbnail,
+        photo: item?.photo,
+        media: item?.media,
+        images: item?.images,
+        listing_media: item?.listing_media,
+      },
+      null,
+      2
+    )
+  );
+}
+  
   if (pickedImage === null) {
     console.log('Marketplace listing missing coverImage', {
       id: item.id,
@@ -336,8 +381,8 @@ const mapListing = (item: RawMarketplaceListing, index: number): MarketplaceList
     });
   }
   
-   const sellerDisplayName = pickSellerDisplayName(item);
-  const sellerLogo = pickSellerLogo(item);
+    const farmName = pickFarmName(item);
+  const farmLogo = pickFarmLogo(item);
   
   return {
      ...item, 
@@ -358,10 +403,16 @@ const mapListing = (item: RawMarketplaceListing, index: number): MarketplaceList
     grade: toTrimmedString(item.grade),
     country: toTrimmedString(item.country),
     city: toTrimmedString(item.city),
-  sellerName: sellerDisplayName,
-    sellerLogo,
-    farmName: sellerDisplayName,
-    farmLogo: sellerLogo,
+  sellerName: null,
+    sellerLogo: farmLogo,
+    farmName,
+    farmLogo,
+    sellerFarmName: farmName,
+    sellerFarmLogo: farmLogo,
+    shopName: farmName,
+    shopLogo: farmLogo,
+    storeName: farmName,
+    storeLogo: farmLogo,
     ratingAverage: toNumber(item.rating?.average),
     ratingCount: toCount(item.rating?.count),
     rankingScore: toNumber(item.ranking_score) ?? 0,
