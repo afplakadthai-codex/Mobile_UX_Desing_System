@@ -122,9 +122,10 @@ const normalizeAssetUrl = (value: Nullable<string | number>): string | null => {
   if (/^https?:\/\//i.test(normalizedValue)) {
     return normalizedValue;  
   }
+  
 
   if (normalizedValue.startsWith('//')) {
-    return removeDuplicateSlashes(`https:${normalizedValue}`);
+    return `https:${normalizedValue}`;
   }
 
  if (normalizedValue.startsWith('/')) {
