@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
   Image,
@@ -13,6 +15,7 @@ import {
 
 import { fetchMarketplaceListings, MarketplaceListing } from '../services/api/marketplace';
 import { colors, radii, shadows, spacing } from '../theme/tokens';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 
 type FeedStatus = 'idle' | 'loading' | 'refreshing' | 'error' | 'success';
 
@@ -117,6 +120,7 @@ const formatStatus = (status: string) =>
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'B';
 
 function ListingCard({ listing }: { listing: MarketplaceListing }) {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'Home'>>();
   const cardListing = listing as ListingCardData;
   const [imageFailed, setImageFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
@@ -244,7 +248,7 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
           <Text style={styles.currency}>{listingCurrency.toUpperCase()}</Text>
         </View>
 
-        <Pressable accessibilityRole="button" style={styles.detailButton} onPress={() => console.log('View listing', listing.id)}>
+        <Pressable accessibilityRole="button" style={styles.detailButton} onPress={() => navigation.navigate('ListingDetail', { listingId: String(listing.id), listing: cardListing })}>
           <Text style={styles.detailButtonText}>View Detail →</Text>
         </Pressable>
       </View>
