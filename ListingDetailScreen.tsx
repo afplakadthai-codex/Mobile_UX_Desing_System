@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Image,
+  Linking,  
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -16,6 +17,12 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 type ListingDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ListingDetail'>;
 
 type ListingRecord = Record<string, unknown>;
+
+type ListingMediaItem = {
+  type: 'image' | 'video';
+  url: string;
+  thumbnail?: string;
+};
 
 type RatingRecord = {
   average?: number | string | null;
@@ -81,6 +88,112 @@ const getFarmName = (listing: ListingRecord) =>
     'seller_store_name',
     'seller_business_name',
   ]);
+  
+ 
+const cleanMediaUrl = (url: unknown): string | null => {
+  if (!hasText(url)) {
+    return null;
+  }
+
+  const trimmedUrl = url.trim();
+  return trimmedUrl.length > 0 ? trimmedUrl : null;
+};
+
+const isVideoUrl = (url: unknown): boolean => {
+  const mediaUrl = cleanMediaUrl(url);
+
+  if (!mediaUrl) {
+    return false;
+  }
+
+  return /\.(m3u8|mov|mp4|m4v|webm)(?:[?#].*)?$/i.test(mediaUrl);
+};
+
+const getMediaString = (value: unknown, keys: string[]): string | null => {
+  if (hasText(value)) {
+    return cleanMediaUrl(value);
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  for (const key of keys) {
+    const mediaUrl = cleanMediaUrl(value[key]);
+
+    if (mediaUrl) {
+      return mediaUrl;
+    }
+  }
+
+  return null;
+};
+
+const collectMediaValues = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (hasText(value) || isRecord(value)) {
+    return [value];
+  }
+
+  return [];
+};
+
+const normalizeMediaCandidate = (value: unknown, fallbackType: ListingMediaItem['type']): ListingMediaItem | null => {
+  const url = getMediaString(value, ['url', 'uri', 'src', 'image', 'image_url', 'photo', 'photo_url', 'video', 'video_url', 'clip_url']);
+
+  if (!url) {
+    return null;
+  }
+
+  const mediaType = isRecord(value)
+    ? getMediaString(value, ['type', 'media_type', 'mime_type', 'content_type'])
+    : null;
+  const thumbnail = getMediaString(value, ['thumbnail', 'thumbnail_url', 'thumb', 'thumb_url', 'poster', 'poster_url']) ?? undefined;
+  const type = mediaType?.toLowerCase().includes('video') || isVideoUrl(url) ? 'video' : fallbackType;
+
+  return { type, url, thumbnail };
+};
+
+const normalizeListingMedia = (listing: ListingRecord): ListingMediaItem[] => {
+  const mediaItems: ListingMediaItem[] = [];
+  const seenUrls = new Set<string>();
+
+  const addMediaItem = (item: ListingMediaItem | null) => {
+    if (!item) {
+      return;
+    }
+
+    const cleanedUrl = cleanMediaUrl(item.url);
+
+    if (!cleanedUrl || seenUrls.has(cleanedUrl)) {
+      return;
+    }
+
+    seenUrls.add(cleanedUrl);
+    mediaItems.push({ ...item, url: cleanedUrl });
+  };
+
+  const imageKeys = ['coverImage', 'imageUrl', 'image_url', 'cover_image', 'cover_image_url', 'images', 'photos', 'gallery', 'image_urls'];
+  const mixedMediaKeys = ['media'];
+  const videoKeys = ['video_url', 'video', 'clip_url', 'videos'];
+
+  imageKeys.forEach((key) => {
+    collectMediaValues(listing[key]).forEach((value) => addMediaItem(normalizeMediaCandidate(value, 'image')));
+  });
+
+  mixedMediaKeys.forEach((key) => {
+    collectMediaValues(listing[key]).forEach((value) => addMediaItem(normalizeMediaCandidate(value, isVideoUrl(value) ? 'video' : 'image')));
+  });
+
+  videoKeys.forEach((key) => {
+    collectMediaValues(listing[key]).forEach((value) => addMediaItem(normalizeMediaCandidate(value, 'video')));
+  });
+
+  return mediaItems;
+}; 
 
 const getFarmLogo = (listing: ListingRecord) =>
   getNestedString(listing, ['seller', 'farm_logo']) ??
@@ -246,14 +359,24 @@ const formatListingPrice = (listing: ListingRecord, currency: string) => {
 
 
 export function ListingDetailScreen({ navigation, route }: ListingDetailScreenProps) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const listing = useMemo(() => (isRecord(route.params.listing) ? route.params.listing : {}), [route.params.listing]);
+ const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+  const [failedMediaUrls, setFailedMediaUrls] = useState<Record<string, boolean>>({});
+  const listing: ListingRecord = useMemo(() => (isRecord(route.params.listing) ? route.params.listing : {}), [route.params.listing]);
+
+  const mediaItems: ListingMediaItem[] = useMemo(() => normalizeListingMedia(listing), [listing]);
+  const mediaKey = mediaItems.map((item: ListingMediaItem) => item.url).join('|');
+  const selectedMedia = mediaItems[selectedMediaIndex] ?? mediaItems[0];
+  const selectedMediaFailed = selectedMedia ? failedMediaUrls[selectedMedia.url] : false;
+
+  useEffect(() => {
+    setSelectedMediaIndex(0);
+    setFailedMediaUrls({});
+  }, [mediaKey]);
+ 
 
   const title = getString(listing, ['title', 'name']) ?? `Listing #${route.params.listingId}`;
    const currency = getString(listing, ['priceCurrency', 'currency', 'price_currency']) ?? 'USD';
-  const imageUrl = getString(listing, ['coverImage', 'imageUrl', 'image_url', 'cover_image', 'cover_image_url']);
- const optimizedImageUrl = getOptimizedImageUrl(imageUrl, 1000);
-  const description =
+   const description =
     getString(listing, ['shortDescription', 'short_description', 'description']) ?? 'No description available yet.';
   const isAuction = getBoolean(listing, ['auctionEnabled', 'auction_enabled', 'isAuction', 'is_auction']);
   const saleStatus = getString(listing, ['saleStatus', 'sale_status', 'status']) ?? 'available';
@@ -283,16 +406,38 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent} style={styles.container}>
         <View style={styles.imageFrame}>
-          {hasText(imageUrl) && !imageFailed ? (
+         {selectedMedia?.type === 'image' && !selectedMediaFailed ? (
             <Image
               accessibilityIgnoresInvertColors
               resizeMode="cover"
              resizeMethod="resize"
               fadeDuration={150}
-              source={{ uri: optimizedImageUrl ?? imageUrl }}
+            source={{ uri: getOptimizedImageUrl(selectedMedia.url, 1000) ?? selectedMedia.url }}
               style={styles.image}
-              onError={() => setImageFailed(true)}
+            onError={() => setFailedMediaUrls((current: Record<string, boolean>) => ({ ...current, [selectedMedia.url]: true }))} 
             />
+  ) : selectedMedia?.type === 'video' ? (
+            <View style={styles.videoPreview}>
+              {hasText(selectedMedia.thumbnail) ? (
+                <Image
+                  accessibilityIgnoresInvertColors
+                  resizeMode="cover"
+                  resizeMethod="resize"
+                  source={{ uri: getOptimizedImageUrl(selectedMedia.thumbnail, 1000) ?? selectedMedia.thumbnail }}
+                  style={styles.videoThumbnail}
+                />
+              ) : null}
+              <View style={styles.videoOverlay}>
+                <Text style={styles.videoLabel}>Video Clip</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.videoButton}
+                  onPress={() => Linking.openURL(selectedMedia.url)}
+                >
+                  <Text style={styles.videoButtonText}>Play / Open</Text>
+                </Pressable>
+              </View>
+            </View>			
           ) : (
             <View style={styles.imageFallback}>
               <Text style={styles.imageFallbackText}>Bettavaro</Text>
@@ -309,6 +454,50 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
             ) : null}
           </View>
         </View>
+		
+        {mediaItems.length > 1 ? (
+          <ScrollView
+            contentContainerStyle={styles.thumbnailContent}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.thumbnailScroller}
+          >
+            {mediaItems.map((item: ListingMediaItem, index: number) => {
+              const thumbnailUrl = item.thumbnail ?? item.url;
+              const isSelected = item.url === selectedMedia?.url;
+
+              return (
+                <Pressable
+                  accessibilityLabel={`${item.type === 'video' ? 'Video Clip' : 'Listing image'} ${index + 1}`}
+                  accessibilityRole="button"
+                  key={`${item.type}-${item.url}`}
+                  onPress={() => setSelectedMediaIndex(index)}
+                  style={[styles.thumbnailButton, isSelected ? styles.thumbnailButtonSelected : null]}
+                >
+                  {item.type === 'image' || hasText(item.thumbnail) ? (
+                    <Image
+                      accessibilityIgnoresInvertColors
+                      resizeMode="cover"
+                      resizeMethod="resize"
+                      source={{ uri: getOptimizedImageUrl(thumbnailUrl, 240) ?? thumbnailUrl }}
+                      style={styles.thumbnailImage}
+                    />
+                  ) : (
+                    <View style={styles.thumbnailVideoFallback}>
+                      <Text style={styles.thumbnailVideoIcon}>▶</Text>
+                    </View>
+                  )}
+                  {item.type === 'video' ? (
+                    <View style={styles.thumbnailVideoBadge}>
+                      <Text style={styles.thumbnailVideoBadgeText}>Video Clip</Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+		
 
         <View style={styles.contentCard}>
           <Text style={styles.title}>{title}</Text>
@@ -415,6 +604,93 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.9,
   },
+
+
+  videoPreview: {
+    backgroundColor: colors.brand.emerald950,
+    flex: 1,
+  },
+  videoThumbnail: {
+    ...StyleSheet.absoluteFillObject,
+    height: '100%',
+    width: '100%',
+  },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    backgroundColor: 'rgba(2, 44, 34, 0.5)',
+    justifyContent: 'center',
+    padding: spacing[5],
+  },
+  videoLabel: {
+    color: colors.neutral[0],
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: spacing[3],
+  },
+  videoButton: {
+    backgroundColor: colors.accent.gold600,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing[5],
+    paddingVertical: spacing[3],
+  },
+  videoButtonText: {
+    color: colors.brand.emerald950,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  thumbnailScroller: {
+    backgroundColor: colors.neutral[0],
+    borderBottomColor: colors.brand.emerald100,
+    borderBottomWidth: 1,
+  },
+  thumbnailContent: {
+    gap: spacing[3],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+  },
+  thumbnailButton: {
+    backgroundColor: colors.brand.emerald50,
+    borderColor: colors.brand.emerald100,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    height: 74,
+    overflow: 'hidden',
+    width: 74,
+  },
+  thumbnailButtonSelected: {
+    borderColor: colors.accent.gold600,
+    borderWidth: 2,
+  },
+  thumbnailImage: {
+    height: '100%',
+    width: '100%',
+  },
+  thumbnailVideoFallback: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  thumbnailVideoIcon: {
+    color: colors.brand.emerald800,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  thumbnailVideoBadge: {
+    backgroundColor: 'rgba(2, 44, 34, 0.78)',
+    bottom: 0,
+    left: 0,
+    paddingVertical: 2,
+    position: 'absolute',
+    right: 0,
+  },
+  thumbnailVideoBadgeText: {
+    color: colors.neutral[0],
+    fontSize: 9,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  
   badgeRow: {
     flexDirection: 'row',
     gap: spacing[2],
