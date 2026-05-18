@@ -31,6 +31,7 @@ type ListingCardData = MarketplaceListing & {
   avgRating?: number | string | null;
   cover_image?: string | null;
   coverImage?: string | null;
+  cover_image_url?: string | null;
   currency?: string | null;
   price?: number | string | null;
    priceFormatted?: string | null;
@@ -51,7 +52,14 @@ type ListingCardData = MarketplaceListing & {
   description?: string | null;
   image_url?: string | null;
   imageUrl?: string | null;
+  image?: string | null;
   is_auction?: boolean | number | string | null;
+  thumbnail?: string | null;
+  thumbnail_url?: string | null;
+  photo?: string | null;
+  photo_url?: string | null;
+  media?: Array<{ url?: string | null; src?: string | null }> | null;
+  images?: Array<{ url?: string | null; src?: string | null }> | null;
   isAuction?: boolean | number | string | null;
   logo_url?: string | null;
   logoUrl?: string | null;
@@ -159,6 +167,16 @@ const listingPriceFormatted =
     cardListing.cover_image ??
     cardListing.imageUrl ??
     cardListing.image_url ??
+    cardListing.cover_image_url ??
+    cardListing.image ??
+    cardListing.thumbnail ??
+    cardListing.thumbnail_url ??
+    cardListing.photo ??
+    cardListing.photo_url ??
+    cardListing.media?.[0]?.url ??
+    cardListing.media?.[0]?.src ??
+    cardListing.images?.[0]?.url ??
+    cardListing.images?.[0]?.src ??
     null;  
   const sellerName =
     cardListing.sellerName ?? cardListing.seller_name ?? cardListing.farmName ?? cardListing.farm_name ?? 'Bettavaro Seller';
@@ -697,3 +715,4 @@ color: colors.neutral[700],
     fontWeight: '700',
   },
 });
+
