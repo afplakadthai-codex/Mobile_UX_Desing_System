@@ -37,7 +37,7 @@ type RawMarketplaceListing = {
   title?: Nullable<string>;
   slug?: Nullable<string>;
   url?: Nullable<string>;
-   coverImage?: Nullable<string>; 
+  coverImage?: Nullable<string>;
   cover_image?: Nullable<string>;
   cover_image_url?: Nullable<string>;
   imageUrl?: Nullable<string>;
@@ -81,8 +81,8 @@ export type MarketplaceListing = {
   slug: string | null;
   url: string | null;
   coverImage: string | null;
- imageUrl: string | null;
-  image_url: string | null; 
+   imageUrl: string | null;
+  image_url: string | null;
   priceFormatted: string;
   priceAmount: number | null;
   priceCurrency: string | null;
@@ -108,7 +108,7 @@ const toTrimmedString = (value: Nullable<string | number>): string | null => {
   return nextValue.length > 0 ? nextValue : null;
 };
 
-const removeDuplicateSlashes = (value: string): string => value.replace(/([^:]\/)\/+/g, '$1');
+
 
 const normalizeAssetUrl = (value: Nullable<string | number>): string | null => {
   const rawValue = toTrimmedString(value);
@@ -120,7 +120,7 @@ const normalizeAssetUrl = (value: Nullable<string | number>): string | null => {
  const normalizedValue = rawValue.replace(/\\+/g, '/');
 
   if (/^https?:\/\//i.test(normalizedValue)) {
-    return removeDuplicateSlashes(normalizedValue);
+    return normalizedValue;  
   }
 
   if (normalizedValue.startsWith('//')) {
@@ -128,10 +128,10 @@ const normalizeAssetUrl = (value: Nullable<string | number>): string | null => {
   }
 
  if (normalizedValue.startsWith('/')) {
-    return removeDuplicateSlashes(`${MARKETPLACE_ORIGIN}${normalizedValue}`);
+    return `${MARKETPLACE_ORIGIN}${normalizedValue}`;
   }
 
-  return removeDuplicateSlashes(`${MARKETPLACE_ORIGIN}/${normalizedValue}`);
+  return `${MARKETPLACE_ORIGIN}/${normalizedValue}`; 
 };
 
 const pickListingImage = (item: RawMarketplaceListing): string | null => {
@@ -166,7 +166,7 @@ const pickListingImage = (item: RawMarketplaceListing): string | null => {
     }
   }
 
- return null;
+  return null;
 };
 
 const toNumber = (value: Nullable<string | number>): number | null => {
@@ -186,17 +186,17 @@ const toCount = (value: Nullable<string | number>): number => {
 const mapListing = (item: RawMarketplaceListing, index: number): MarketplaceListing => {
   const id = toTrimmedString(item.id) ?? `listing-${index}`;
   const price: RawPrice = item.price ?? {};
-const listingImage = pickListingImage(item);  
-
+  const pickedImage = pickListingImage(item);
+  
   return {
-    ...item,	  
+     ...item, 
     id,
     title: toTrimmedString(item.title) ?? 'Untitled Betta Listing',
     slug: toTrimmedString(item.slug),
     url: toTrimmedString(item.url),
-    coverImage: listingImage,
-    imageUrl: listingImage,
-    image_url: listingImage,
+     coverImage: pickedImage,
+    imageUrl: pickedImage,
+    image_url: pickedImage,
     priceFormatted: toTrimmedString(price.formatted) ?? 'Price unavailable',
     priceAmount: toNumber(price.amount),
     priceCurrency: toTrimmedString(price.currency),

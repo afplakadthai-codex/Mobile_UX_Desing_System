@@ -61,6 +61,23 @@ const getNumber = (listing: ListingRecord, keys: string[]) => {
   return null;
 };
 
+const getRawPriceValue = (listing: ListingRecord, keys: string[]) => {
+  for (const key of keys) {
+    const value = listing[key];
+
+    if (typeof value === 'number') {
+      return value;
+    }
+
+    if (hasText(value)) {
+      return value.trim();
+    }
+  }
+
+  return null;
+};
+
+
 const toBoolean = (value: unknown) => {
   if (typeof value === 'boolean') {
     return value;
@@ -110,6 +127,58 @@ const formatPrice = (price: number | string | null, currency: string) => {
   }
 };
 
+const isUnavailablePrice = (price: unknown) => {
+  if (price === null || price === undefined) {
+    return true;
+  }
+
+  if (typeof price === 'number') {
+    return price === 0;
+  }
+
+  if (typeof price === 'string') {
+    const priceText = price.trim();
+
+    if (priceText.length === 0) {
+      return true;
+    }
+
+    return toNumber(priceText) === 0;
+  }
+
+  return false;
+};
+
+const formatListingPrice = (listing: ListingRecord, currency: string) => {
+  const formattedPrice = getString(listing, ['priceFormatted']);
+
+  if (formattedPrice !== null && formattedPrice !== 'Price unavailable') {
+    return formattedPrice;
+  }
+
+  const rawPrice = getRawPriceValue(listing, [
+    'discountedPrice',
+    'discounted_price',
+    'finalPrice',
+    'final_price',
+    'price',
+    'basePrice',
+    'base_price',
+    'priceAmount',
+  ]);
+
+  if (isUnavailablePrice(rawPrice)) {
+    return 'Contact for price';
+  }
+
+  if (typeof rawPrice === 'number' || typeof rawPrice === 'string') {
+    return formatPrice(rawPrice, currency);
+  }
+
+  return 'Contact for price';
+};
+
+
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'B';
 
 export function ListingDetailScreen({ navigation, route }: ListingDetailScreenProps) {
@@ -118,8 +187,8 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
   const listing = useMemo(() => (isRecord(route.params.listing) ? route.params.listing : {}), [route.params.listing]);
 
   const title = getString(listing, ['title', 'name']) ?? `Listing #${route.params.listingId}`;
-  const currency = getString(listing, ['currency']) ?? 'USD';
-  const imageUrl = getString(listing, ['coverImage', 'cover_image', 'imageUrl', 'image_url']);
+   const currency = getString(listing, ['priceCurrency', 'currency', 'price_currency']) ?? 'USD';
+  const imageUrl = getString(listing, ['coverImage', 'imageUrl', 'image_url', 'cover_image', 'cover_image_url']); 
   const sellerName =
     getString(listing, ['sellerName', 'seller_name', 'farmName', 'farm_name', 'seller', 'farm']) ?? 'Bettavaro Seller';
   const sellerLogo = getString(listing, ['sellerLogo', 'seller_logo', 'farmLogo', 'farm_logo', 'logoUrl', 'logo_url']);
@@ -135,10 +204,9 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
   const reviewCount = getNumber(listing, ['reviewCount', 'review_count', 'reviews_count']) ?? toNumber(ratingRecord?.count);
   const originalPriceValue = getNumber(listing, ['originalPrice', 'original_price']);
   const discountedPriceValue = getNumber(listing, ['discountedPrice', 'discounted_price', 'finalPrice', 'final_price']);
-  const basePriceValue = getNumber(listing, ['price']);
   const hasDiscount =
     originalPriceValue !== null && discountedPriceValue !== null && originalPriceValue > discountedPriceValue;
-  const currentPrice = formatPrice(hasDiscount ? discountedPriceValue : basePriceValue, currency);
+  const currentPrice = formatListingPrice(listing, currency);
   const originalPrice = hasDiscount ? formatPrice(originalPriceValue, currency) : null;
   const basicInfo = [
     ['Species', getString(listing, ['species'])],
