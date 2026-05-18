@@ -31,17 +31,21 @@ type RawListingMedia = {
   file_name?: Nullable<string>;
   image_path?: Nullable<string>;
   image_url?: Nullable<string>;
-  path?: Nullable<string>;  
+  path?: Nullable<string>;
+  full_path?: Nullable<string>;
+  public_url?: Nullable<string>; 
 };
 
 type RawListingImage = {
   url?: Nullable<string>;
   src?: Nullable<string>;
   storage_path?: Nullable<string>;
-  file_name?: Nullable<string>;  
+  file_name?: Nullable<string>;
   image_path?: Nullable<string>;
   image_url?: Nullable<string>;
-  path?: Nullable<string>;  
+  path?: Nullable<string>;
+  full_path?: Nullable<string>;
+  public_url?: Nullable<string>;
 };
 
 type RawRating = {
@@ -167,8 +171,34 @@ const normalizeAssetUrl = (value: Nullable<string | number>): string | null => {
   return `${MARKETPLACE_ORIGIN}/${normalizedValue}`;
 };
 
+const pickListingFileNameCandidate = (
+  listingId: Nullable<string | number>,
+  fileName: Nullable<string | number>,
+): Nullable<string | number> => {
+  const normalizedFileName = toTrimmedString(fileName)?.replace(/\\+/g, '/');
+
+  if (normalizedFileName === undefined || normalizedFileName === null) {
+    return fileName;
+  }
+
+  if (normalizedFileName.includes('/')) {
+    return fileName;
+  }
+
+  const normalizedListingId = toTrimmedString(listingId);
+
+  if (normalizedListingId === null) {
+    return fileName;
+  }
+
+  return `${MARKETPLACE_ORIGIN}/uploads/listings/${encodeURIComponent(
+    normalizedListingId,
+  )}/${encodeURIComponent(normalizedFileName)}`;
+};
+
 const collectMediaCandidates = (
   records: Nullable<Array<RawListingMedia | RawListingImage>>,
+   listingId: Nullable<string | number>, 
 ): Array<Nullable<string | number>> => {
   if (!Array.isArray(records)) {
     return [];
@@ -178,10 +208,12 @@ const collectMediaCandidates = (
     record.url,
     record.src,
     record.storage_path,
-    record.file_name,
+pickListingFileNameCandidate(listingId, record.file_name),   
     record.image_path,
     record.image_url,
     record.path,
+    record.full_path,
+    record.public_url,	
   ]);
 };
 
@@ -197,9 +229,9 @@ const pickListingImage = (item: RawMarketplaceListing): string | null => {
     item.thumbnail_url,
     item.photo,
     item.photo_url,
-    ...collectMediaCandidates(item.media),
-    ...collectMediaCandidates(item.images),
-    ...collectMediaCandidates(item.listing_media),
+  ...collectMediaCandidates(item.media, item.id),
+    ...collectMediaCandidates(item.images, item.id),
+    ...collectMediaCandidates(item.listing_media, item.id),  
   ];
 
   for (const candidate of candidates) {
@@ -287,6 +319,22 @@ const mapListing = (item: RawMarketplaceListing, index: number): MarketplaceList
   const id = toTrimmedString(item.id) ?? `listing-${index}`;
   const price: RawPrice = item.price ?? {};
   const pickedImage = pickListingImage(item);
+  
+  if (pickedImage === null) {
+    console.log('Marketplace listing missing coverImage', {
+      id: item.id,
+      title: item.title,
+      cover_image: item.cover_image,
+      cover_image_url: item.cover_image_url,
+      image_url: item.image_url,
+      image: item.image,
+      thumbnail: item.thumbnail,
+      photo: item.photo,
+      media: item.media,
+      images: item.images,
+      listing_media: item.listing_media,
+    });
+  }
   
    const sellerDisplayName = pickSellerDisplayName(item);
   const sellerLogo = pickSellerLogo(item);
