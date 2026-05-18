@@ -41,6 +41,11 @@ type ListingCardData = MarketplaceListing & {
   farmName?: string | null;
   final_price?: number | string | null;
   finalPrice?: number | string | null;
+  basePrice?: number | string | null;
+  base_price?: number | string | null;
+  shortDescription?: string | null;
+  short_description?: string | null;
+  description?: string | null;
   image_url?: string | null;
   imageUrl?: string | null;
   is_auction?: boolean | number | string | null;
@@ -129,7 +134,19 @@ function ListingCard({ listing, onViewDetail }: ListingCardProps) {
   const [logoFailed, setLogoFailed] = useState(false);
 
   const listingCurrency = cardListing.currency ?? 'USD';
-  const listingPrice = cardListing.price ?? null;
+  const listingPrice =
+    cardListing.discountedPrice ??
+    cardListing.discounted_price ??
+    cardListing.finalPrice ??
+    cardListing.final_price ??
+    cardListing.price ??
+    cardListing.basePrice ??
+    cardListing.base_price ??
+    cardListing.originalPrice ??
+    cardListing.original_price ??
+    null;
+  const listingDescription =
+    cardListing.shortDescription ?? cardListing.short_description ?? cardListing.description ?? '';
   const imageUrl = cardListing.coverImage ?? cardListing.cover_image ?? cardListing.imageUrl ?? cardListing.image_url;
   const sellerName =
     cardListing.sellerName ?? cardListing.seller_name ?? cardListing.farmName ?? cardListing.farm_name ?? 'Bettavaro Seller';
@@ -167,8 +184,8 @@ function ListingCard({ listing, onViewDetail }: ListingCardProps) {
     originalPriceValue !== null && discountedPriceValue !== null && originalPriceValue > discountedPriceValue;
   const price = useMemo(
     () =>
-      listingPrice === null
-        ? ''
+      listingPrice === null || String(listingPrice).trim() === ''
+        ? 'Contact for price'
         : formatPrice(hasDiscount && discountedPriceValue !== null ? discountedPriceValue : listingPrice, listingCurrency),
     [discountedPriceValue, hasDiscount, listingCurrency, listingPrice],
   );
@@ -215,6 +232,12 @@ function ListingCard({ listing, onViewDetail }: ListingCardProps) {
             <Text style={styles.price}>{price}</Text>
           </View>
         </View>
+
+        {hasText(listingDescription) ? (
+          <Text numberOfLines={2} style={styles.cardDescription}>
+            {listingDescription.trim()}
+          </Text>
+        ) : null}
 
         <View style={styles.ratingRow}>
           <Text style={styles.stars}>{ratingAverage !== null ? '★★★★★' : '☆☆☆☆☆'}</Text>
@@ -371,7 +394,7 @@ export function HomeScreen({ navigation }: HomeScreenProps = {}) {
 
                   console.log('View Detail', listing.id);
                 }}
-              />      
+              />
             ))}
           </View>
         ) : null}
@@ -524,6 +547,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontVariant: ['tabular-nums'],
     fontWeight: '700',
+  },
+  cardDescription: {
+color: colors.neutral[700],
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: spacing[2],
   },
   ratingRow: {
     alignItems: 'center',
