@@ -241,6 +241,163 @@ function mobile_get_mysqli_columns(mysqli $mysqli): array
     return mobile_normalize_columns($rows);
 }
 
+
+function mobile_get_pdo_table_columns(PDO $pdo, string $table): ?array
+{
+    try {
+        $stmt = $pdo->query('SHOW COLUMNS FROM `' . $table . '`');
+        if ($stmt === false) {
+            return null;
+        }
+
+        return mobile_normalize_columns($stmt->fetchAll(PDO::FETCH_ASSOC));
+    } catch (PDOException $exception) {
+        return null;
+    }
+}
+
+function mobile_get_mysqli_table_columns(mysqli $mysqli, string $table): ?array
+{
+    try {
+        $result = $mysqli->query('SHOW COLUMNS FROM `' . $table . '`');
+        if (!$result) {
+            return null;
+        }
+
+        $rows = [];
+        while ($row = $result->fetch_assoc()) {
+            $rows[] = $row;
+        }
+        $result->free();
+
+        return mobile_normalize_columns($rows);
+    } catch (mysqli_sql_exception $exception) {
+        return null;
+    }
+}
+
+function mobile_auth_token_values(array $columns, int $userId, string $plainToken, string $tokenHash, DateTimeImmutable $expiresAt): array
+{
+    $now = new DateTimeImmutable('now');
+    $values = [];
+
+    if (isset($columns['user_id'])) {
+        $values['user_id'] = $userId;
+    }
+    if (isset($columns['token_hash'])) {
+        $values['token_hash'] = $tokenHash;
+    }
+    if (isset($columns['token'])) {
+        $values['token'] = $tokenHash;
+    }
+    if (isset($columns['plain_token'])) {
+        $values['plain_token'] = $plainToken;
+    }
+    if (isset($columns['token_prefix'])) {
+        $values['token_prefix'] = substr($plainToken, 0, 12);
+    }
+    if (isset($columns['device_name'])) {
+        $values['device_name'] = mobile_string($GLOBALS['mobile_request_data'] ?? [], 'device_name') ?: null;
+    }
+    if (isset($columns['device_id'])) {
+        $values['device_id'] = mobile_string($GLOBALS['mobile_request_data'] ?? [], 'device_id') ?: null;
+    }
+    if (isset($columns['ip_address'])) {
+        $values['ip_address'] = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    }
+    if (isset($columns['user_agent'])) {
+        $values['user_agent'] = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 500);
+    }
+    if (isset($columns['created_at'])) {
+        $values['created_at'] = $now;
+    }
+    if (isset($columns['updated_at'])) {
+        $values['updated_at'] = $now;
+    }
+    if (isset($columns['last_used_at'])) {
+        $values['last_used_at'] = null;
+    }
+    if (isset($columns['expires_at'])) {
+        $values['expires_at'] = $expiresAt;
+    }
+
+    return $values;
+}
+
+function mobile_pdo_insert_mobile_auth_token(PDO $pdo, int $userId, string $plainToken, string $tokenHash, DateTimeImmutable $expiresAt): bool
+{
+    $columns = mobile_get_pdo_table_columns($pdo, 'mobile_auth_tokens');
+    if ($columns === null || !isset($columns['user_id']) || (!isset($columns['token_hash']) && !isset($columns['token']))) {
+        return false;
+    }
+
+    $values = mobile_auth_token_values($columns, $userId, $plainToken, $tokenHash, $expiresAt);
+    $insertColumns = array_keys($values);
+    if ($insertColumns === []) {
+        return false;
+    }
+
+    $placeholders = [];
+    $params = [];
+    foreach ($insertColumns as $column) {
+        if ($values[$column] instanceof DateTimeInterface) {
+            $placeholder = ':' . $column;
+            $placeholders[] = $placeholder;
+            $params[$placeholder] = $values[$column]->format('Y-m-d H:i:s');
+            continue;
+        }
+
+        $placeholder = ':' . $column;
+        $placeholders[] = $placeholder;
+        $params[$placeholder] = $values[$column];
+    }
+
+    $sql = 'INSERT INTO mobile_auth_tokens (`' . implode('`, `', $insertColumns) . '`) VALUES (' . implode(', ', $placeholders) . ')';
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+
+    return true;
+}
+
+function mobile_mysqli_insert_mobile_auth_token(mysqli $mysqli, int $userId, string $plainToken, string $tokenHash, DateTimeImmutable $expiresAt): bool
+{
+    $columns = mobile_get_mysqli_table_columns($mysqli, 'mobile_auth_tokens');
+    if ($columns === null || !isset($columns['user_id']) || (!isset($columns['token_hash']) && !isset($columns['token']))) {
+        return false;
+    }
+
+    $values = mobile_auth_token_values($columns, $userId, $plainToken, $tokenHash, $expiresAt);
+    $insertColumns = array_keys($values);
+    if ($insertColumns === []) {
+        return false;
+    }
+
+    $placeholders = [];
+    $bindValues = [];
+    $types = '';
+    foreach ($insertColumns as $column) {
+        $placeholders[] = '?';
+        if ($values[$column] instanceof DateTimeInterface) {
+            $bindValues[] = $values[$column]->format('Y-m-d H:i:s');
+        } else {
+            $bindValues[] = $values[$column];
+        }
+        $types .= is_int($bindValues[array_key_last($bindValues)]) ? 'i' : 's';
+    }
+
+    $sql = 'INSERT INTO mobile_auth_tokens (`' . implode('`, `', $insertColumns) . '`) VALUES (' . implode(', ', $placeholders) . ')';
+    $stmt = $mysqli->prepare($sql);
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param($types, ...$bindValues);
+    $stmt->execute();
+    $stmt->close();
+
+    return true;
+}
+
 function mobile_pdo_email_exists(PDO $pdo, string $email): bool
 {
     $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
@@ -379,6 +536,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 }
 
 $data = mobile_request_data();
+$GLOBALS['mobile_request_data'] = $data;
 
 $form = [
     'first_name' => mobile_string($data, 'first_name'),
@@ -431,6 +589,10 @@ try {
     if (!$pdo && !$mysqli) {
         $pdo = mobile_make_pdo_from_constants();
     }
+	
+ $token = null;
+    $warnings = [];
+    $expiresInDays = 90;	
 
     if ($pdo) {
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -446,6 +608,26 @@ try {
         $passwordHash = password_hash($form['password'], PASSWORD_DEFAULT);
         $values = mobile_insert_values($columns, $form, $passwordHash);
         $userId = mobile_pdo_insert_user($pdo, $values);
+		
+    $plainToken = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $plainToken);
+        $expiresAt = new DateTimeImmutable('+' . $expiresInDays . ' days');
+        try {
+            if (mobile_pdo_insert_mobile_auth_token($pdo, $userId, $plainToken, $tokenHash, $expiresAt)) {
+                $token = $plainToken;
+            } else {
+                $warnings[] = [
+                    'code' => 'token_storage_missing',
+                    'message' => 'Mobile token storage is not available; please sign in to create a session token.',
+                ];
+            }
+        } catch (Throwable $exception) {
+            mobile_log_internal($exception->getMessage());
+            $warnings[] = [
+                'code' => 'token_storage_unavailable',
+                'message' => 'Mobile token storage is temporarily unavailable; please sign in to create a session token.',
+            ];
+        }
     } elseif ($mysqli) {
         $mysqli->set_charset('utf8mb4');
         $columns = mobile_get_mysqli_columns($mysqli);
@@ -460,13 +642,37 @@ try {
         $passwordHash = password_hash($form['password'], PASSWORD_DEFAULT);
         $values = mobile_insert_values($columns, $form, $passwordHash);
         $userId = mobile_mysqli_insert_user($mysqli, $values);
+		
+
+        $plainToken = bin2hex(random_bytes(32));
+        $tokenHash = hash('sha256', $plainToken);
+        $expiresAt = new DateTimeImmutable('+' . $expiresInDays . ' days');
+        try {
+            if (mobile_mysqli_insert_mobile_auth_token($mysqli, $userId, $plainToken, $tokenHash, $expiresAt)) {
+                $token = $plainToken;
+            } else {
+                $warnings[] = [
+                    'code' => 'token_storage_missing',
+                    'message' => 'Mobile token storage is not available; please sign in to create a session token.',
+                ];
+            }
+        } catch (Throwable $exception) {
+            mobile_log_internal($exception->getMessage());
+            $warnings[] = [
+                'code' => 'token_storage_unavailable',
+                'message' => 'Mobile token storage is temporarily unavailable; please sign in to create a session token.',
+            ];
+        }		
     } else {
         mobile_error_response(503, 'db_unavailable', 'Database is unavailable.');
     }
 
-    mobile_json_response(201, [
+   $response = [
         'ok' => true,
         'data' => [
+          'token' => $token,
+            'token_type' => 'Bearer',
+            'expires_in_days' => $expiresInDays,		
             'user' => [
                 'id' => $userId,
                 'first_name' => $form['first_name'],
@@ -475,9 +681,20 @@ try {
                 'role' => 'user',
                 'account_status' => 'active',
             ],
+           'onboarding' => [
+                'headline' => 'Welcome to Bettavaro',
+                'message' => 'Enter the world of premium betta fish.',
+                'next_step' => 'explore_marketplace',
+            ],			
         ],
         'meta' => mobile_meta(),
-    ]);
+  ];
+
+    if ($warnings !== []) {
+        $response['warnings'] = $warnings;
+    }
+
+    mobile_json_response(201, $response);  
 } catch (PDOException|mysqli_sql_exception $exception) {
     mobile_log_internal($exception->getMessage());
     mobile_error_response(503, 'db_unavailable', 'Database is unavailable.');
