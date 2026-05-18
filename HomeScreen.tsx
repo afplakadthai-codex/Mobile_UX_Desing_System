@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ActivityIndicator,
@@ -119,8 +118,12 @@ const formatStatus = (status: string) =>
 
 const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'B';
 
-function ListingCard({ listing }: { listing: MarketplaceListing }) {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'Home'>>();
+type ListingCardProps = {
+  listing: MarketplaceListing;
+  onViewDetail: () => void;
+};
+
+function ListingCard({ listing, onViewDetail }: ListingCardProps) {
   const cardListing = listing as ListingCardData;
   const [imageFailed, setImageFailed] = useState(false);
   const [logoFailed, setLogoFailed] = useState(false);
@@ -248,7 +251,7 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
           <Text style={styles.currency}>{listingCurrency.toUpperCase()}</Text>
         </View>
 
-        <Pressable accessibilityRole="button" style={styles.detailButton} onPress={() => navigation.navigate('ListingDetail', { listingId: String(listing.id), listing: cardListing })}>
+         <Pressable accessibilityRole="button" style={styles.detailButton} onPress={onViewDetail}>
           <Text style={styles.detailButtonText}>View Detail →</Text>
         </Pressable>
       </View>
@@ -257,6 +260,11 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
 }
 
 export function HomeScreen() {
+type HomeScreenProps = {
+  navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
+};
+
+export function HomeScreen({ navigation }: HomeScreenProps) {
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [status, setStatus] = useState<FeedStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -350,7 +358,16 @@ export function HomeScreen() {
         {!isLoading && !isError && listings.length > 0 ? (
           <View style={styles.feed}>
             {listings.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
+              <ListingCard
+                key={listing.id}
+                listing={listing}
+                onViewDetail={() => {
+                  navigation.navigate('ListingDetail', {
+                    listingId: listing.id,
+                    listing,
+                  });
+                }}
+              />      
             ))}
           </View>
         ) : null}
