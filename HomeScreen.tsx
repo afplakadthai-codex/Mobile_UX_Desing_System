@@ -259,12 +259,11 @@ function ListingCard({ listing, onViewDetail }: ListingCardProps) {
   );
 }
 
-export function HomeScreen() {
 type HomeScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
+  navigation?: NativeStackNavigationProp<RootStackParamList, 'Home'>;
 };
 
-export function HomeScreen({ navigation }: HomeScreenProps) {
+export function HomeScreen({ navigation }: HomeScreenProps = {}) {
   const [listings, setListings] = useState<MarketplaceListing[]>([]);
   const [status, setStatus] = useState<FeedStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -362,10 +361,15 @@ export function HomeScreen({ navigation }: HomeScreenProps) {
                 key={listing.id}
                 listing={listing}
                 onViewDetail={() => {
-                  navigation.navigate('ListingDetail', {
-                    listingId: listing.id,
-                    listing,
-                  });
+                  if (navigation) {
+                    navigation.navigate('ListingDetail', {
+                      listingId: listing.id,
+                      listing,
+                    });
+                    return;
+                  }
+
+                  console.log('View Detail', listing.id);
                 }}
               />      
             ))}
