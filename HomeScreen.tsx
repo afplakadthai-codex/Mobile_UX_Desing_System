@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 
@@ -17,135 +16,154 @@ import { colors, radii, shadows, spacing } from '../theme/tokens';
 
 type FeedStatus = 'idle' | 'loading' | 'refreshing' | 'error' | 'success';
 
-type ListingPrice = {
-  amount?: number | string | null;
-  currency?: string | null;
-  formatted?: string | null;
-};
-
-type ListingSeller = {
-  logo?: string | null;
-  logo_url?: string | null;
-  name?: string | null;
-};
-
-type ListingRating = {
+type RatingValue = {
   average?: number | string | null;
+  avg?: number | string | null;
   count?: number | string | null;
 };
 
-
-
 type ListingCardData = MarketplaceListing & {
-  coverImage?: string | null;
+  auction_enabled?: boolean | number | string | null;
+  auctionEnabled?: boolean | number | string | null;
+  avg_rating?: number | string | null;
+  avgRating?: number | string | null;
   cover_image?: string | null;
-  discountedPrice?: ListingPrice | number | string | null;
-  discounted_price?: ListingPrice | number | string | null;
-  originalPrice?: ListingPrice | number | string | null;
-  original_price?: ListingPrice | number | string | null;
-  price?: ListingPrice | string | null;
-  rating?: ListingRating | null;
-  seller?: ListingSeller | null;
-  sellerLogo?: string | null;
+  coverImage?: string | null;
+  discounted_price?: number | string | null;
+  discountedPrice?: number | string | null;
+  farm_logo?: string | null;
+  farm_name?: string | null;
+  farmLogo?: string | null;
+  farmName?: string | null;
+  final_price?: number | string | null;
+  finalPrice?: number | string | null;
+  image_url?: string | null;
+  imageUrl?: string | null;  
+  is_auction?: boolean | number | string | null;
+  isAuction?: boolean | number | string | null;
+  logo_url?: string | null;
+  logoUrl?: string | null;
+  original_price?: number | string | null;
+  originalPrice?: number | string | null;
+  rating?: number | string | RatingValue | null;
+  review_average?: number | string | null;
+  reviewAverage?: number | string | null;
+  review_count?: number | string | null;
+  reviewCount?: number | string | null;
+  reviews_count?: number | string | null;
   seller_logo?: string | null;
-  seller_logo_url?: string | null;
-  species?: string | null;
-  strain?: string | null;
-  grade?: string | null;
-  imageUrl?: string;
-  currency?: string;
-  auctionEnabled?: boolean;
+  seller_name?: string | null;
+  sellerLogo?: string | null;
+  sellerName?: string | null;
+  status?: string | null;
 };
 
 const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 
-const formatPrice = (price: number | string | null | undefined, currency: string | null | undefined) => {
-  if (price === null || price === undefined || price === '') {
+const toNumber = (value: number | string | null | undefined) => {
+  if (value === null || value === undefined || value === '') {
     return null;
   }
 
-  const normalizedCurrency = hasText(currency) ? currency.trim().toUpperCase() : 'USD';
+  const numberValue = typeof value === 'number' ? value : Number(String(value).replace(/[^\d.-]/g, ''));
+  return Number.isFinite(numberValue) ? numberValue : null;
+};
+
+const toBoolean = (value: boolean | number | string | null | undefined) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return value === 1;
+  }
+
+  return hasText(value) ? ['1', 'true', 'yes'].includes(value.trim().toLowerCase()) : false;
+};
+
+const formatPrice = (price: number | string, currency: string) => {
+  const normalizedCurrency = currency.toUpperCase();
   const priceText = String(price).trim();
 
   if (priceText.toUpperCase().includes(normalizedCurrency)) {
     return priceText;
   }
 
-  const numericPrice = typeof price === 'number' ? price : Number(priceText.replace(/,/g, ''));
+  const numericPrice = Number(priceText.replace(/,/g, ''));
 
   if (!Number.isFinite(numericPrice)) {
-    return `${normalizedCurrency} ${priceText}`;
+    return `${priceText} ${normalizedCurrency}`;
   }
 
-  return `${normalizedCurrency} ${numericPrice.toLocaleString('en-US', {
-    maximumFractionDigits: numericPrice % 1 === 0 ? 0 : 2,
-    minimumFractionDigits: numericPrice % 1 === 0 ? 0 : 2,
-  })}`;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: normalizedCurrency,
+      maximumFractionDigits: numericPrice % 1 === 0 ? 0 : 2,
+    }).format(numericPrice);
+  } catch {
+    return `${numericPrice.toLocaleString('en-US')} ${normalizedCurrency}`;
+  }
 };
 
-const getPriceDisplay = (
-  price: ListingPrice | number | string | null | undefined,
-  fallbackCurrency: string | null | undefined,
-) => {
-  if (typeof price === 'object' && price !== null) {
-    if (hasText(price.formatted)) {
-      return price.formatted.trim();
-    }
-
-    return formatPrice(price.amount, price.currency ?? fallbackCurrency);
-  }
-
-  return formatPrice(price, fallbackCurrency);
-};
-
-const getInitials = (name: string | null | undefined) => {
-  if (!hasText(name)) {
-    return 'BV';
-  }
-
-  const initials = name
+const formatStatus = (status: string) =>
+  status
+    .replace(/[_-]+/g, ' ')
     .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join('');
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 
-  return initials || 'BV';
-};
-
-const getDiscountPercent = (original: string | null, discounted: string | null) => {
-  if (!original || !discounted) {
-    return null;
-  }
-
-  const originalValue = Number(original.replace(/[^\d.]/g, ''));
-  const discountedValue = Number(discounted.replace(/[^\d.]/g, ''));
-
-  if (!Number.isFinite(originalValue) || !Number.isFinite(discountedValue) || originalValue <= discountedValue) {
-    return null;
-  }
-
-  return Math.round(((originalValue - discountedValue) / originalValue) * 100);
-};
+const getInitial = (name: string) => name.trim().charAt(0).toUpperCase() || 'B';
 
 function ListingCard({ listing }: { listing: MarketplaceListing }) {
   const cardListing = listing as ListingCardData;
   const [imageFailed, setImageFailed] = useState(false);
-  const [sellerLogoFailed, setSellerLogoFailed] = useState(false);
+  const [logoFailed, setLogoFailed] = useState(false);
 
-  const imageUrl = cardListing.coverImage ?? cardListing.cover_image ?? cardListing.imageUrl;
-  const sellerName = cardListing.seller?.name ?? cardListing.sellerName ?? 'BETTA SOCIETY';
-  const sellerLogo = cardListing.seller?.logo ?? cardListing.seller?.logo_url ?? cardListing.sellerLogo ?? cardListing.seller_logo_url ?? cardListing.seller_logo;
-  const isAvailable = cardListing.saleStatus.toLowerCase() === 'available';
-  const ratingCount = Number(cardListing.rating?.count ?? 0);
-  const ratingAverage = Number(cardListing.rating?.average ?? 5);
-  const metadata = [cardListing.species, cardListing.strain, cardListing.grade].filter(hasText).join(' • ');
-  const originalPrice = getPriceDisplay(cardListing.originalPrice ?? cardListing.original_price, cardListing.currency);
-  const discountedPrice = getPriceDisplay(cardListing.discountedPrice ?? cardListing.discounted_price, cardListing.currency);
-  const basePrice = getPriceDisplay(cardListing.price, cardListing.currency);
-  const hasDiscount = Boolean(originalPrice && discountedPrice && originalPrice !== discountedPrice);
-  const discountPercent = getDiscountPercent(originalPrice, discountedPrice);
-  const price = hasDiscount ? discountedPrice : basePrice;
+  const imageUrl = cardListing.coverImage ?? cardListing.cover_image ?? cardListing.imageUrl ?? cardListing.image_url;
+  const sellerName =
+    cardListing.sellerName ?? cardListing.seller_name ?? cardListing.farmName ?? cardListing.farm_name ?? 'Bettavaro Seller';
+  const sellerLogo =
+    cardListing.sellerLogo ??
+    cardListing.seller_logo ??
+    cardListing.farmLogo ??
+    cardListing.farm_logo ??
+    cardListing.logoUrl ??
+    cardListing.logo_url;
+  const isAuction =
+    cardListing.auctionEnabled ||
+    toBoolean(cardListing.auction_enabled) ||
+    toBoolean(cardListing.isAuction) ||
+    toBoolean(cardListing.is_auction);
+  const saleStatus = (cardListing.saleStatus ?? cardListing.status ?? 'available').toLowerCase();
+  const statusLabel = isAuction ? 'Auction' : formatStatus(saleStatus);
+  const ratingFromObject = typeof cardListing.rating === 'object' ? cardListing.rating : null;
+  const ratingAverage =
+    toNumber(cardListing.avgRating) ??
+    toNumber(cardListing.avg_rating) ??
+    toNumber(typeof cardListing.rating === 'object' ? ratingFromObject?.average ?? ratingFromObject?.avg : cardListing.rating) ??
+    toNumber(cardListing.reviewAverage) ??
+    toNumber(cardListing.review_average);
+  const reviewCount =
+    toNumber(cardListing.reviewCount) ??
+    toNumber(cardListing.review_count) ??
+    toNumber(cardListing.reviews_count) ??
+    toNumber(ratingFromObject?.count);
+  const originalPriceValue = toNumber(cardListing.originalPrice ?? cardListing.original_price);
+  const discountedPriceValue = toNumber(
+    cardListing.discountedPrice ?? cardListing.discounted_price ?? cardListing.finalPrice ?? cardListing.final_price,
+  );
+  const hasDiscount =
+    originalPriceValue !== null && discountedPriceValue !== null && originalPriceValue > discountedPriceValue;
+  const price = useMemo(
+    () => formatPrice(hasDiscount && discountedPriceValue !== null ? discountedPriceValue : listing.price, listing.currency),
+    [discountedPriceValue, hasDiscount, listing.currency, listing.price],
+  );
+  const originalPrice =
+    hasDiscount && originalPriceValue !== null ? formatPrice(originalPriceValue, listing.currency) : null;
+  const discountPercent =
+    hasDiscount && originalPriceValue !== null && discountedPriceValue !== null
+      ? Math.round(((originalPriceValue - discountedPriceValue) / originalPriceValue) * 100)
+      : null;
 
   return (
     <View style={styles.card}>
@@ -163,78 +181,65 @@ function ListingCard({ listing }: { listing: MarketplaceListing }) {
             <Text style={styles.imageFallbackText}>Bettavaro</Text>
           </View>
         )}
-
-        {isAvailable ? (
-          <View style={styles.availableBadge}>
-            <View style={styles.availableDot} />
-            <Text style={styles.availableBadgeText}>Available</Text>
-          </View>
-        ) : null}
-
-        {cardListing.auctionEnabled ? (
-          <View style={styles.auctionBadge}>
-            <Text style={styles.auctionBadgeText}>Auction</Text>
+        <View style={[styles.auctionBadge, !isAuction && styles.statusBadge]}>
+          <Text style={[styles.auctionBadgeText, !isAuction && styles.statusBadgeText]}>{statusLabel}</Text>
+        </View>
+        {hasDiscount ? (
+          <View style={styles.discountBadge}>
+            <Text style={styles.discountBadgeText}>{discountPercent ? `-${discountPercent}%` : 'SALE'}</Text>
           </View>
         ) : null}
       </View>
 
       <View style={styles.cardBody}>
+        <View style={styles.cardHeader}>
+          <Text numberOfLines={2} style={styles.cardTitle}>
+            {listing.title}
+          </Text>
+          <View style={styles.priceRow}>
+            {originalPrice ? <Text style={styles.originalPrice}>{originalPrice}</Text> : null}
+            <Text style={styles.price}>{price}</Text>
+          </View>
+        </View>
+
+        <View style={styles.ratingRow}>
+          <Text style={styles.stars}>{ratingAverage !== null ? '★★★★★' : '☆☆☆☆☆'}</Text>
+          <Text style={styles.ratingText}>
+            {ratingAverage !== null
+              ? `${ratingAverage.toFixed(1)}${reviewCount !== null ? ` (${reviewCount} ${reviewCount === 1 ? 'review' : 'reviews'})` : ''}`
+              : 'No reviews yet'}
+          </Text>
+        </View>
+
         <View style={styles.sellerRow}>
-          {hasText(sellerLogo) && !sellerLogoFailed ? (
+          {hasText(sellerLogo) && !logoFailed ? (
             <Image
               accessibilityIgnoresInvertColors
               resizeMode="cover"
               source={{ uri: sellerLogo }}
               style={styles.sellerLogo}
-              onError={() => setSellerLogoFailed(true)}
+              onError={() => setLogoFailed(true)}
             />
           ) : (
-            <View style={styles.sellerAvatar}>
-              <Text style={styles.sellerAvatarText}>{getInitials(sellerName)}</Text>
+            <View style={styles.sellerInitial}>
+              <Text style={styles.sellerInitialText}>{getInitial(sellerName)}</Text>
             </View>
           )}
-          <Text numberOfLines={1} style={styles.sellerName}>
+          <Text numberOfLines={1} style={styles.seller}>
             {sellerName}
           </Text>
         </View>
 
-        <Text numberOfLines={2} style={styles.cardTitle}>
-          {cardListing.title}
-        </Text>
-
-        {ratingCount > 0 ? (
-          <View style={styles.ratingRow}>
-            <Text style={styles.ratingStars}>★★★★★</Text>
-            <Text style={styles.ratingText}>
-              {ratingAverage.toFixed(1)} ({ratingCount} {ratingCount === 1 ? 'review' : 'reviews'})
-            </Text>
+        <View style={styles.metaRow}>
+          <View style={styles.statusPill}>
+            <Text style={styles.statusText}>{statusLabel}</Text>
           </View>
-        ) : (
-          <Text style={styles.noReviews}>No reviews yet</Text>
-        )}
-
-        {hasText(metadata) ? (
-          <Text numberOfLines={3} style={styles.metadata}>
-            {metadata}
-          </Text>
-        ) : null}
-
-        <View style={styles.cardFooter}>
-          <View style={styles.priceBlock}>
-            {hasDiscount && originalPrice ? <Text style={styles.originalPrice}>{originalPrice}</Text> : null}
-            {price ? <Text style={styles.price}>{price}</Text> : null}
-          </View>
-
-          {hasDiscount && discountPercent ? (
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountBadgeText}>-{discountPercent}%</Text>
-            </View>
-          ) : null}
+          <Text style={styles.currency}>{listing.currency.toUpperCase()}</Text>
         </View>
 
-        <TouchableOpacity accessibilityRole="button" activeOpacity={0.82} style={styles.detailsButton}>
-          <Text style={styles.detailsButtonText}>View Details →</Text>
-        </TouchableOpacity>
+        <Pressable accessibilityRole="button" style={styles.detailButton} onPress={() => console.log('View listing', listing.id)}>
+          <Text style={styles.detailButtonText}>View Detail →</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -389,18 +394,15 @@ const styles = StyleSheet.create({
   },
   card: {
     ...shadows.card,
-    backgroundColor: colors.brand.emerald950,
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: colors.neutral[0],
+    borderColor: colors.brand.emerald100,
     borderRadius: radii.lg,
     borderWidth: 1,
     overflow: 'hidden',
-    shadowColor: colors.brand.emerald950,
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
   },
   imageFrame: {
-    aspectRatio: 1.28,
-    backgroundColor: colors.brand.emerald900,
+    aspectRatio: 1.38,
+    backgroundColor: colors.brand.emerald50,
     borderTopLeftRadius: radii.lg,
     borderTopRightRadius: radii.lg,
     overflow: 'hidden',
@@ -421,31 +423,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.8,
   },
-  availableBadge: {
-    alignItems: 'center',
-    backgroundColor: colors.neutral[0],
-    borderRadius: radii.pill,
-    flexDirection: 'row',
-    gap: spacing[1],
-    left: spacing[3],
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[1],
-    position: 'absolute',
-    top: spacing[3],
-  },
-  availableDot: {
-    backgroundColor: colors.brand.emerald700,
-    borderRadius: radii.pill,
-    height: 7,
-    width: 7,
-  },
-  availableBadgeText: {
-    color: colors.brand.emerald700,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.7,
-    textTransform: 'uppercase',
-  },
   auctionBadge: {
     backgroundColor: colors.accent.gold600,
     borderRadius: radii.pill,
@@ -456,131 +433,152 @@ const styles = StyleSheet.create({
     top: spacing[3],
   },
   auctionBadgeText: {
-    color: colors.brand.emerald950,
+    color: colors.neutral[0],
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.7,
     textTransform: 'uppercase',
   },
+  statusBadge: {
+    backgroundColor: colors.neutral[0],
+    borderColor: colors.brand.emerald100,
+    borderWidth: 1,
+  },
+  statusBadgeText: {
+    color: colors.brand.emerald700,
+  },
+  discountBadge: {
+    backgroundColor: colors.brand.emerald800,
+    borderRadius: radii.pill,
+    left: spacing[3],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    position: 'absolute',
+    top: spacing[3],
+  },
+  discountBadgeText: {
+    color: colors.accent.gold200,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.7,
+  },
   cardBody: {
-    gap: spacing[3],
     padding: spacing[4],
   },
-  sellerRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
+  cardHeader: {
     gap: spacing[2],
   },
-  sellerLogo: {
-    backgroundColor: colors.brand.emerald800,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    width: 36,
-  },
-  sellerAvatar: {
-    alignItems: 'center',
-    backgroundColor: colors.brand.emerald800,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 18,
-    borderWidth: 1,
-    height: 36,
-    justifyContent: 'center',
-    width: 36,
-  },
-  sellerAvatarText: {
-    color: colors.accent.gold200,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  sellerName: {
-    color: colors.brand.emerald100,
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
+  priceRow: {
+    alignItems: 'baseline',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
   },
   cardTitle: {
-    color: colors.neutral[0],
-    fontSize: 20,
-    fontWeight: '800',
-    lineHeight: 26,
-  },
-  ratingRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: spacing[2],
-  },
-  ratingStars: {
-    color: colors.accent.gold500,
-    fontSize: 13,
-    letterSpacing: 0.5,
-  },
-  ratingText: {
-    color: colors.brand.emerald100,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  noReviews: {
-    color: colors.brand.emerald100,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  metadata: {
-    color: colors.brand.emerald50,
-    fontSize: 14,
-    lineHeight: 21,
-  },
-  cardFooter: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing[3],
-    marginTop: spacing[1],
-  },
-  priceBlock: {
-    flex: 1,
-    gap: spacing[1],
+    color: colors.neutral[900],
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 24,
   },
   originalPrice: {
-    color: colors.brand.emerald100,
-    fontSize: 13,
+    color: colors.neutral[500],
+    fontSize: 14,
     fontVariant: ['tabular-nums'],
     fontWeight: '600',
     textDecorationLine: 'line-through',
   },
   price: {
-    color: colors.accent.gold500,
-    fontSize: 20,
+    color: colors.brand.emerald800,
+    fontSize: 18,
     fontVariant: ['tabular-nums'],
-    fontWeight: '800',
+    fontWeight: '700',
   },
-  discountBadge: {
-    backgroundColor: colors.brand.emerald700,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing[2],
-    paddingVertical: spacing[1],
+  ratingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing[2],
+    marginTop: spacing[3],
   },
-  discountBadgeText: {
-    color: colors.neutral[0],
-    fontSize: 12,
-    fontWeight: '800',
+  stars: {
+    color: colors.accent.gold600,
+    fontSize: 13,
+    letterSpacing: 0.4,
   },
-  detailsButton: {
-    alignSelf: 'flex-end',
-    borderColor: 'rgba(216,175,97,0.55)',
+  ratingText: {
+    color: colors.neutral[500],
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sellerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing[2],
+    marginTop: spacing[3],
+  },
+  sellerLogo: {
+    backgroundColor: colors.brand.emerald50,
+    borderColor: colors.brand.emerald100,
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 32,
+    width: 32,
+  },
+  sellerInitial: {
+    alignItems: 'center',
+    backgroundColor: colors.brand.emerald800,
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  sellerInitialText: {
+    color: colors.accent.gold200,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  metaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing[2],
+    marginTop: spacing[3],
+  },
+  statusPill: {
+    backgroundColor: colors.brand.emerald50,
+    borderColor: colors.brand.emerald100,
     borderRadius: radii.pill,
     borderWidth: 1,
-    marginTop: spacing[1],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+  },
+  statusText: {
+    color: colors.brand.emerald700,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  currency: {
+    color: colors.neutral[500],
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  seller: {
+    color: colors.neutral[700],
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  detailButton: {
+    alignSelf: 'flex-end',
+    backgroundColor: colors.brand.emerald800,
+    borderRadius: radii.pill,
+    marginTop: spacing[4],
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
   },
-  detailsButtonText: {
-    color: colors.accent.gold500,
-    fontSize: 14,
-    fontWeight: '800',
+  detailButtonText: {
+    color: colors.neutral[0],
+    fontSize: 13,
+    fontWeight: '700',
   },
   statePanel: {
     ...shadows.card,
