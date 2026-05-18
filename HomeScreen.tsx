@@ -245,6 +245,19 @@ const listingPriceFormatted =
     hasDiscount && originalPriceValue !== null && discountedPriceValue !== null
       ? Math.round(((originalPriceValue - discountedPriceValue) / originalPriceValue) * 100)
       : null;
+ const farmName =
+    cardListing.farmName ??
+    cardListing.sellerFarmName ??
+    cardListing.shopName ??
+    cardListing.storeName ??
+    null;
+
+  const farmLogo =
+    cardListing.farmLogo ??
+    cardListing.sellerFarmLogo ??
+    cardListing.shopLogo ??
+    cardListing.storeLogo ??
+    null;	  	  
 
   return (
     <View style={styles.card}>
