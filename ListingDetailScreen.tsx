@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Image,
-  Linking,  
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { fetchListingDetail } from '../services/api/marketplace';
 import { colors, radii, shadows, spacing } from '../theme/tokens';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 
@@ -29,6 +30,18 @@ type RatingRecord = {
   avg?: number | string | null;
   count?: number | string | null;
 };
+
+type PriceRecord = {
+  formatted?: number | string | null;
+  amount?: number | string | null;
+  currency?: string | null;
+};
+
+type ReviewsRecord = {
+  summary?: unknown;
+};
+
+declare const __DEV__: boolean | undefined;
 
 const isRecord = (value: unknown): value is ListingRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -55,6 +68,22 @@ const getString = (listing: ListingRecord, keys: string[]) => {
   return null;
 };
 
+const getDisplayString = (listing: ListingRecord, keys: string[]) => {
+  for (const key of keys) {
+    const value = listing[key];
+
+    if (hasText(value)) {
+      return value.trim();
+    }
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return String(value);
+    }
+  }
+
+  return null;
+};
+
 const getNestedString = (listing: ListingRecord, path: string[]) => {
   let value: unknown = listing;
 
@@ -74,6 +103,8 @@ const getFarmName = (listing: ListingRecord) =>
   getNestedString(listing, ['seller', 'shop_name']) ??
   getNestedString(listing, ['seller', 'store_name']) ??
   getNestedString(listing, ['seller', 'business_name']) ??
+  getNestedString(listing, ['seller', 'name']) ??
+  getNestedString(listing, ['seller', 'display_name']) ??
   getString(listing, [
     'farmName',
     'sellerFarmName',
@@ -88,8 +119,8 @@ const getFarmName = (listing: ListingRecord) =>
     'seller_store_name',
     'seller_business_name',
   ]);
-  
- 
+
+
 const cleanMediaUrl = (url: unknown): string | null => {
   if (!hasText(url)) {
     return null;
@@ -193,7 +224,7 @@ const normalizeListingMedia = (listing: ListingRecord): ListingMediaItem[] => {
   });
 
   return mediaItems;
-}; 
+};
 
 const getFarmLogo = (listing: ListingRecord) =>
   getNestedString(listing, ['seller', 'farm_logo']) ??
@@ -201,6 +232,9 @@ const getFarmLogo = (listing: ListingRecord) =>
   getNestedString(listing, ['seller', 'shop_logo']) ??
   getNestedString(listing, ['seller', 'store_logo']) ??
   getNestedString(listing, ['seller', 'business_logo']) ??
+  getNestedString(listing, ['seller', 'logo']) ??
+  getNestedString(listing, ['seller', 'logo_url']) ??
+  getNestedString(listing, ['seller', 'avatar_url']) ??
   getString(listing, [
     'farmLogo',
     'sellerFarmLogo',
@@ -252,6 +286,20 @@ const getRawPriceValue = (listing: ListingRecord, keys: string[]) => {
 
     if (hasText(value)) {
       return value.trim();
+    }
+  }
+
+  const price = listing.price;
+
+  if (isRecord(price)) {
+    const priceRecord = price as PriceRecord;
+
+    if (typeof priceRecord.amount === 'number') {
+      return priceRecord.amount;
+    }
+
+    if (hasText(priceRecord.amount)) {
+      return priceRecord.amount.trim();
     }
   }
 
@@ -331,7 +379,11 @@ const isUnavailablePrice = (price: unknown) => {
 };
 
 const formatListingPrice = (listing: ListingRecord, currency: string) => {
-  const formattedPrice = getString(listing, ['priceFormatted', 'price_formatted']);
+  const price = listing.price;
+  const priceRecord = isRecord(price) ? (price as PriceRecord) : null;
+  const formattedPriceValue = priceRecord?.formatted;
+  const formattedPrice = getString(listing, ['priceFormatted', 'price_formatted']) ??
+    (hasText(formattedPriceValue) ? formattedPriceValue.trim() : null);
 
   if (formattedPrice !== null && formattedPrice !== 'Price unavailable') {
     return formattedPrice;
@@ -359,9 +411,47 @@ const formatListingPrice = (listing: ListingRecord, currency: string) => {
 
 
 export function ListingDetailScreen({ navigation, route }: ListingDetailScreenProps) {
- const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [failedMediaUrls, setFailedMediaUrls] = useState<Record<string, boolean>>({});
-  const listing: ListingRecord = useMemo(() => (isRecord(route.params.listing) ? route.params.listing : {}), [route.params.listing]);
+  const [fullListing, setFullListing] = useState<ListingRecord | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const fallbackListing: ListingRecord = useMemo(
+    () => (isRecord(route.params.listing) ? route.params.listing : {}),
+    [route.params.listing],
+  );
+  const listing: ListingRecord = useMemo(
+    () => ({ ...fallbackListing, ...(fullListing ?? {}) }),
+    [fallbackListing, fullListing],
+  );
+  const listingId = route.params.listingId;
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    setFullListing(null);
+    setLoadingDetail(true);
+    setDetailError(null);
+
+    fetchListingDetail(listingId, controller.signal)
+      .then((detail: ListingRecord) => {
+        setFullListing(detail);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setDetailError(error instanceof Error ? error.message : 'Unable to load listing detail.');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoadingDetail(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [listingId]);
 
   const mediaItems: ListingMediaItem[] = useMemo(() => normalizeListingMedia(listing), [listing]);
   const mediaKey = mediaItems.map((item: ListingMediaItem) => item.url).join('|');
@@ -372,20 +462,41 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
     setSelectedMediaIndex(0);
     setFailedMediaUrls({});
   }, [mediaKey]);
- 
 
-  const title = getString(listing, ['title', 'name']) ?? `Listing #${route.params.listingId}`;
-   const currency = getString(listing, ['priceCurrency', 'currency', 'price_currency']) ?? 'USD';
-   const description =
+  useEffect(() => {
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      console.log('Listing detail media keys', {
+        listingId,
+        images: listing.images,
+        media: listing.media,
+        videos: listing.videos,
+        video_url: listing.video_url,
+        clip_url: listing.clip_url,
+      });
+    }
+  }, [listing, listingId]);
+
+
+  const title = getString(listing, ['title', 'name']) ?? `Listing #${listingId}`;
+  const priceRecord = isRecord(listing.price) ? (listing.price as PriceRecord) : null;
+  const priceCurrency = priceRecord?.currency;
+  const currency =
+    getString(listing, ['priceCurrency', 'currency', 'price_currency']) ??
+    (hasText(priceCurrency) ? priceCurrency.trim() : 'USD');
+  const description =
     getString(listing, ['shortDescription', 'short_description', 'description']) ?? 'No description available yet.';
   const isAuction = getBoolean(listing, ['auctionEnabled', 'auction_enabled', 'isAuction', 'is_auction']);
   const saleStatus = getString(listing, ['saleStatus', 'sale_status', 'status']) ?? 'available';
   const ratingValue = listing.rating;
   const ratingRecord = isRecord(ratingValue) ? (ratingValue as RatingRecord) : null;
+  const reviewsRecord = isRecord(listing.reviews) ? (listing.reviews as ReviewsRecord) : null;
+  const reviewSummary = isRecord(reviewsRecord?.summary) ? (reviewsRecord.summary as RatingRecord) : null;
   const ratingAverage =
     getNumber(listing, ['avgRating', 'avg_rating', 'reviewAverage', 'review_average']) ??
-    toNumber(ratingRecord?.average ?? ratingRecord?.avg ?? ratingValue);
-  const reviewCount = getNumber(listing, ['reviewCount', 'review_count', 'reviews_count']) ?? toNumber(ratingRecord?.count);
+    toNumber(ratingRecord?.average ?? ratingRecord?.avg ?? reviewSummary?.average ?? reviewSummary?.avg ?? ratingValue);
+  const reviewCount =
+    getNumber(listing, ['reviewCount', 'review_count', 'reviews_count']) ??
+    toNumber(ratingRecord?.count ?? reviewSummary?.count);
   const originalPriceValue = getNumber(listing, ['originalPrice', 'original_price']);
   const discountedPriceValue = getNumber(listing, ['discountedPrice', 'discounted_price', 'finalPrice', 'final_price']);
   const hasDiscount =
@@ -393,13 +504,13 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
   const currentPrice = formatListingPrice(listing, currency);
   const originalPrice = hasDiscount ? formatPrice(originalPriceValue, currency) : null;
   const farmName = getFarmName(listing);
-  const farmLogo = getFarmLogo(listing); 
+  const farmLogo = getFarmLogo(listing);
   const basicInfo = [
-    ['Species', getString(listing, ['species'])],
-    ['Strain', getString(listing, ['strain'])],
-    ['Gender', getString(listing, ['gender', 'sex'])],
-    ['Size', getString(listing, ['size'])],
-    ['Age', getString(listing, ['age'])],
+    ['Species', getDisplayString(listing, ['species'])],
+    ['Strain', getDisplayString(listing, ['strain'])],
+    ['Gender', getDisplayString(listing, ['gender', 'sex'])],
+    ['Size', getDisplayString(listing, ['size'])],
+    ['Age', getDisplayString(listing, ['age', 'age_months'])],
   ].filter((item): item is [string, string] => hasText(item[1]));
 
   return (
@@ -414,7 +525,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
               fadeDuration={150}
             source={{ uri: getOptimizedImageUrl(selectedMedia.url, 1000) ?? selectedMedia.url }}
               style={styles.image}
-            onError={() => setFailedMediaUrls((current: Record<string, boolean>) => ({ ...current, [selectedMedia.url]: true }))} 
+            onError={() => setFailedMediaUrls((current: Record<string, boolean>) => ({ ...current, [selectedMedia.url]: true }))}
             />
   ) : selectedMedia?.type === 'video' ? (
             <View style={styles.videoPreview}>
@@ -437,7 +548,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
                   <Text style={styles.videoButtonText}>Play / Open</Text>
                 </Pressable>
               </View>
-            </View>			
+            </View>
           ) : (
             <View style={styles.imageFallback}>
               <Text style={styles.imageFallbackText}>Bettavaro</Text>
@@ -454,7 +565,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
             ) : null}
           </View>
         </View>
-		
+
         {mediaItems.length > 1 ? (
           <ScrollView
             contentContainerStyle={styles.thumbnailContent}
@@ -497,7 +608,10 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
             })}
           </ScrollView>
         ) : null}
-		
+
+
+        {loadingDetail ? <Text style={styles.detailStatusText}>Loading full listing details…</Text> : null}
+        {detailError ? <Text style={styles.detailErrorText}>{detailError}</Text> : null}
 
         <View style={styles.contentCard}>
           <Text style={styles.title}>{title}</Text>
@@ -515,7 +629,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
                 : 'No reviews yet'}
             </Text>
           </View>
-		  
+
          {hasText(farmName) ? (
             <View style={styles.sellerRow}>
               {hasText(farmLogo) ? (
@@ -535,7 +649,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
               </Text>
             </View>
           ) : null}
-		  
+
 
             <View style={styles.section}>
             <Text style={styles.sectionTitle}>Description</Text>
@@ -557,10 +671,10 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
           ) : null}
 
           <View style={styles.actions}>
-            <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => console.log('Add to Cart', route.params.listingId)}>
+            <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => console.log('Add to Cart', listingId)}>
               <Text style={styles.primaryButtonText}>Add to Cart</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => console.log('Make Offer', route.params.listingId)}>
+            <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => console.log('Make Offer', listingId)}>
               <Text style={styles.secondaryButtonText}>Make Offer</Text>
             </Pressable>
             <Pressable accessibilityRole="button" style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -690,7 +804,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
-  
+
   badgeRow: {
     flexDirection: 'row',
     gap: spacing[2],
@@ -723,6 +837,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
+  },
+  detailStatusText: {
+    color: colors.neutral[500],
+    fontSize: 13,
+    fontWeight: '700',
+    marginHorizontal: spacing[4],
+    marginTop: spacing[3],
+  },
+  detailErrorText: {
+    color: '#B42318',
+    fontSize: 13,
+    fontWeight: '700',
+    marginHorizontal: spacing[4],
+    marginTop: spacing[3],
   },
   contentCard: {
     ...shadows.card,
@@ -890,3 +1018,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
+

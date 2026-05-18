@@ -1,5 +1,6 @@
 const MARKETPLACE_ORIGIN = 'https://bettavaro.com';
 const MARKETPLACE_LISTINGS_URL = `${MARKETPLACE_ORIGIN}/api/mobile/v1/listings.php`;
+const MARKETPLACE_LISTING_DETAIL_URL = `${MARKETPLACE_ORIGIN}/api/mobile/v1/listing_detail.php`;
 
 type Nullable<T> = T | null | undefined;
 
@@ -21,7 +22,7 @@ type RawSeller = {
    farm_logo_path?: Nullable<string>; 
   shop_logo?: Nullable<string>;
   store_logo?: Nullable<string>;
-  business_logo?: Nullable<string>;  
+  business_logo?: Nullable<string>;
   logo_url?: Nullable<string>;
   avatar_url?: Nullable<string>;
 };
@@ -88,10 +89,10 @@ type RawMarketplaceListing = {
   seller_farm_name?: Nullable<string>;
   seller_shop_name?: Nullable<string>;
   seller_store_name?: Nullable<string>;
-   seller_business_name?: Nullable<string>; 
+   seller_business_name?: Nullable<string>;
   seller_logo?: Nullable<string>;
   farm_logo?: Nullable<string>;
-  farm_logo_path?: Nullable<string>;  
+   farm_logo_path?: Nullable<string>;
   shop_logo?: Nullable<string>;
   store_logo?: Nullable<string>;
   business_logo?: Nullable<string>;
@@ -223,7 +224,7 @@ const collectMediaCandidates = (
     record.url,
     record.src,
     record.storage_path,
- pickListingFileNameCandidate(listingId, record.file_name), 
+ pickListingFileNameCandidate(listingId, record.file_name),
     record.image_path,
     record.image_url,
     record.path,
@@ -442,4 +443,61 @@ export const fetchMarketplaceListings = async (signal?: AbortSignal): Promise<Ma
   }
 
   return payload.data.items.map(mapListing);
+};
+
+
+
+type ListingDetailEnvelope = Record<string, unknown> & {
+  data?: unknown;
+  listing?: unknown;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const extractListingDetail = (payload: unknown): Record<string, unknown> => {
+  if (!isRecord(payload)) {
+    throw new Error('Listing detail response did not include listing details.');
+  }
+
+  const envelope = payload as ListingDetailEnvelope;
+
+  if (isRecord(envelope.data)) {
+    const dataEnvelope = envelope.data as ListingDetailEnvelope;
+
+    if (isRecord(dataEnvelope.listing)) {
+      return {
+        ...dataEnvelope.listing,
+        media: dataEnvelope.media,
+        seller: dataEnvelope.seller,
+        reviews: dataEnvelope.reviews,
+        cta: dataEnvelope.cta,
+        ranking: dataEnvelope.ranking,
+        meta: dataEnvelope.meta,
+      };
+    }
+
+    return envelope.data;
+  }
+
+  if (isRecord(envelope.listing)) {
+    return envelope.listing;
+  }
+
+  return payload;
+};
+
+export const fetchListingDetail = async (
+  listingId: string,
+  signal?: AbortSignal,
+): Promise<Record<string, unknown>> => {
+  const url = `${MARKETPLACE_LISTING_DETAIL_URL}?id=${encodeURIComponent(listingId)}`;
+  const response = await fetch(url, { signal });
+
+  if (!response.ok) {
+    throw new Error('Unable to load listing detail.');
+  }
+
+  const payload: unknown = await response.json();
+  return extractListingDetail(payload);
 };
