@@ -1,6 +1,7 @@
 import { ReactElement, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MemberProfileScreen } from './MemberProfileScreen';
 
 type UserRole = 'user' | 'seller' | 'admin';
 
@@ -12,7 +13,7 @@ type CurrentUser = {
 };
 
 export function AccountScreen(): ReactElement {
-  const [mode, setMode] = useState<'account' | 'login' | 'register'>('account');
+  const [mode, setMode] = useState<'account' | 'login' | 'register' | 'memberProfile'>('account');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,11 +56,15 @@ export function AccountScreen(): ReactElement {
     return (user.capabilities ?? []).some((capability) => capability.toLowerCase().includes('seller'));
   };
 
-  const handleComingNext = (feature: string): void => {
+ const handleComingNext = (feature: string): void => {
     Alert.alert('Coming next', `${feature} will be available soon.`);
   };
 
- const handleLoginSubmit = async (): Promise<void> => {
+  const handleOpenMemberDashboard = (): void => {
+    setMode('memberProfile');
+  };
+
+ const handleLoginSubmit = async (): Promise<void> => { 
     if (!email.trim() || !password.trim()) {
       setErrorMessage('Email and password are required.');
       return;
@@ -155,6 +160,8 @@ export function AccountScreen(): ReactElement {
             <Text style={styles.cardTitle}>Register</Text>
             <Text style={styles.subtitle}>Registration form UI will be added next.</Text>
           </View>
+         ) : mode === 'memberProfile' && authToken ? (
+          <MemberProfileScreen token={authToken} onBack={() => setMode('account')} />
         ) : (
           <>
             <Text style={styles.title}>Bettavaro Account</Text>
@@ -187,9 +194,9 @@ export function AccountScreen(): ReactElement {
 
             {currentUser && authToken ? (
               <>
-                <View style={styles.card}>
+               <View style={styles.card}>
                   <Text style={styles.cardTitle}>Account Actions</Text>
-                  <TouchableOpacity style={styles.actionRow} onPress={() => handleComingNext('Member dashboard')} activeOpacity={0.85}>
+                  <TouchableOpacity style={styles.actionRow} onPress={handleOpenMemberDashboard} activeOpacity={0.85}>
                     <Text style={styles.actionText}>Open Member Dashboard</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.actionRow} onPress={() => handleComingNext('Change password')} activeOpacity={0.85}>
