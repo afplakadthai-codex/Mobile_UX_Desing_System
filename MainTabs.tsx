@@ -7,6 +7,7 @@ import { AccountScreen } from '../screens/account/AccountScreen';
 import { CartScreen } from '../screens/cart/CartScreen';
 import { OffersScreen } from '../screens/offers/OffersScreen';
 import { SearchScreen } from '../screens/search/SearchScreen';
+import { ProfileScreen } from './ProfileScreen';
 
 export type HomeStackParamList = {
   Home: undefined;
@@ -14,6 +15,11 @@ export type HomeStackParamList = {
     listingId: string;
     listing?: unknown;
   };
+};
+
+export type AccountStackParamList = {
+  AccountHome: undefined;
+  Profile: undefined;
 };
 
 export type MainTabParamList = {
@@ -26,6 +32,7 @@ export type MainTabParamList = {
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
+const AccountStack = createNativeStackNavigator<AccountStackParamList>();
 
 function HomeStackNavigator() {
   return (
@@ -42,6 +49,22 @@ function HomeStackNavigator() {
   );
 }
 
+
+function AccountStackNavigator() {
+  return (
+    <AccountStack.Navigator
+      initialRouteName="AccountHome"
+      screenOptions={{
+        contentStyle: { backgroundColor: '#F8FAF9' },
+        headerShown: false,
+      }}
+    >
+      <AccountStack.Screen component={AccountScreen} name="AccountHome" />
+      <AccountStack.Screen component={ProfileScreen} name="Profile" />
+    </AccountStack.Navigator>
+  );
+}
+
 export function MainTabs() {
   return (
     <Tab.Navigator
@@ -54,7 +77,7 @@ export function MainTabs() {
       <Tab.Screen component={SearchScreen} name="Search" />
       <Tab.Screen component={CartScreen} name="Cart" />
       <Tab.Screen component={OffersScreen} name="Offers" />
-      <Tab.Screen component={AccountScreen} name="Account" />
+      <Tab.Screen component={AccountStackNavigator} name="Account" />
     </Tab.Navigator>
   );
 }

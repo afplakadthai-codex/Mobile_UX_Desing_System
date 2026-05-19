@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { HomeScreen } from '../screens/HomeScreen';
 import { ListingDetailScreen } from '../screens/ListingDetailScreen';
+import { ProfileScreen } from './ProfileScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -10,6 +11,7 @@ export type RootStackParamList = {
     listingId: string;
     listing?: unknown;
   };
+  Profile: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -26,6 +28,7 @@ export function AppNavigator() {
       >
         <Stack.Screen component={HomeScreen} name="Home" />
         <Stack.Screen component={ListingDetailScreen} name="ListingDetail" />
+        <Stack.Screen component={ProfileScreen} name="Profile" />
       </Stack.Navigator>
     </NavigationContainer>
   );
