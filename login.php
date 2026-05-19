@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
+
 while (ob_get_level() > 0) {
     @ob_end_clean();
 }
@@ -371,12 +375,16 @@ if (!function_exists('bv_mobile_read_input')) {
             return [
                 'email' => trim((string) ($decoded['email'] ?? '')),
                 'password' => (string) ($decoded['password'] ?? ''),
+                'device_name' => trim((string) ($decoded['device_name'] ?? '')),
+                'device_id' => trim((string) ($decoded['device_id'] ?? '')),				
             ];
         }
 
         return [
             'email' => trim((string) ($_POST['email'] ?? '')),
             'password' => (string) ($_POST['password'] ?? ''),
+            'device_name' => trim((string) ($_POST['device_name'] ?? '')),
+            'device_id' => trim((string) ($_POST['device_id'] ?? '')),			
         ];
     }
 }
@@ -406,6 +414,9 @@ try {
     $input = bv_mobile_read_input();
     $email = strtolower($input['email']);
     $password = $input['password'];
+    $deviceName = substr(bv_mobile_clean($input['device_name'] ?? ''), 0, 255);
+    $deviceId = substr(bv_mobile_clean($input['device_id'] ?? ''), 0, 255);
+	
 
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || $password === '') {
         bv_mobile_error('validation_failed', 'Email and password are required. Email must be valid.', 422);
@@ -504,11 +515,11 @@ try {
 
     if (bv_mobile_has_column($tokenColumns, 'device_name')) {
         $insertColumns[] = 'device_name';
-        $insertValues[] = '';
+        $insertValues[] = $deviceName !== '' ? $deviceName : null;
     }
     if (bv_mobile_has_column($tokenColumns, 'device_id')) {
         $insertColumns[] = 'device_id';
-        $insertValues[] = '';
+        $insertValues[] = $deviceId !== '' ? $deviceId : null;
     }
     if (bv_mobile_has_column($tokenColumns, 'user_agent')) {
         $insertColumns[] = 'user_agent';
@@ -537,9 +548,14 @@ try {
     }
 
     $role = bv_mobile_has_column($userColumns, 'role') && bv_mobile_clean($user['role'] ?? '') !== ''
-        ? bv_mobile_clean($user['role'])
+        ? strtolower(bv_mobile_clean($user['role']))
         : 'user';
     $responseAccountStatus = $accountStatus !== '' ? $accountStatus : ($status !== '' ? $status : 'active');
+    $capabilities = [
+        'can_buy' => true,
+        'can_sell' => in_array($role, ['seller', 'admin'], true),
+        'is_admin' => $role === 'admin',
+    ];	
 
     bv_mobile_json(200, [
         'ok' => true,
@@ -555,6 +571,12 @@ try {
                 'role' => $role,
                 'account_status' => $responseAccountStatus,
             ],
+            'capabilities' => $capabilities,
+            'onboarding' => [
+                'headline' => 'Welcome back to Bettavaro',
+                'message' => 'Continue your journey in the world of premium betta fish.',
+                'next_step' => 'explore_marketplace',
+            ],			
         ],
     ]);
 } catch (Throwable $e) {
