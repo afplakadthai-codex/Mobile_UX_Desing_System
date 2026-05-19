@@ -1,13 +1,12 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import { AccountScreen } from '../screens/AccountScreen';
+import { CartScreen } from '../screens/CartScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ListingDetailScreen } from '../screens/ListingDetailScreen';
-import { AccountScreen } from '../screens/account/AccountScreen';
-import { CartScreen } from '../screens/cart/CartScreen';
-import { OffersScreen } from '../screens/offers/OffersScreen';
-import { SearchScreen } from '../screens/search/SearchScreen';
-import { ProfileScreen } from './ProfileScreen';
+import { OffersScreen } from '../screens/OffersScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 
 export type HomeStackParamList = {
   Home: undefined;
@@ -23,7 +22,7 @@ export type AccountStackParamList = {
 };
 
 export type MainTabParamList = {
-  Browse: undefined;
+  Home: undefined;
   Search: undefined;
   Cart: undefined;
   Offers: undefined;
@@ -49,7 +48,6 @@ function HomeStackNavigator() {
   );
 }
 
-
 function AccountStackNavigator() {
   return (
     <AccountStack.Navigator
@@ -65,15 +63,19 @@ function AccountStackNavigator() {
   );
 }
 
+function SearchScreen() {
+  return null;
+}
+
 export function MainTabs() {
   return (
     <Tab.Navigator
-      initialRouteName="Browse"
+      initialRouteName="Home"
       screenOptions={{
         headerShown: false,
       }}
     >
-      <Tab.Screen component={HomeStackNavigator} name="Browse" options={{ title: 'Home' }} />
+      <Tab.Screen component={HomeStackNavigator} name="Home" />
       <Tab.Screen component={SearchScreen} name="Search" />
       <Tab.Screen component={CartScreen} name="Cart" />
       <Tab.Screen component={OffersScreen} name="Offers" />

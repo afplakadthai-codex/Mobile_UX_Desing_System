@@ -1,32 +1,33 @@
+import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import { HomeScreen } from '../screens/HomeScreen';
-import { ListingDetailScreen } from '../screens/ListingDetailScreen';
+import { MainTabs } from './MainTabs';
 import { ProfileScreen } from '../screens/ProfileScreen';
 
 export type RootStackParamList = {
-  Home: undefined;
+  MainTabs: undefined;
+  Profile: undefined;
   ListingDetail: {
     listingId: string;
     listing?: unknown;
   };
-  Profile: undefined;
 };
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 export function AppNavigator() {
   return (
-    <Stack.Navigator
-        initialRouteName="Home"
+    <NavigationContainer>
+      <RootStack.Navigator
+        initialRouteName="MainTabs"
         screenOptions={{
           contentStyle: { backgroundColor: '#F8FAF9' },
           headerShown: false,
         }}
       >
-        <Stack.Screen component={HomeScreen} name="Home" />
-        <Stack.Screen component={ListingDetailScreen} name="ListingDetail" />
-        <Stack.Screen component={ProfileScreen} name="Profile" />
-    </Stack.Navigator>
+        <RootStack.Screen component={MainTabs} name="MainTabs" />
+        <RootStack.Screen component={ProfileScreen} name="Profile" />
+      </RootStack.Navigator>
+    </NavigationContainer>
   );
 }
