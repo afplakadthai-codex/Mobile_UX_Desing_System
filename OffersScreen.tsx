@@ -1,29 +1,58 @@
+import { ReactElement } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet, Text, View } from 'react-native';
 
-export function OffersScreen() {
+export function OffersScreen(): ReactElement {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Offers</Text>
-      <Text style={styles.subtitle}>Your incoming and outgoing offers will appear here.</Text>
-    </View>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Offers</Text>
+        <Text style={styles.subtitle}>Secure offer negotiation system</Text>
+
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>Luxury transactions protected end to end</Text>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#07231d',
+  },
   container: {
-    backgroundColor: '#F8FAF9',
     flex: 1,
     justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: 24,
   },
   title: {
-    color: '#0F172A',
-    fontSize: 24,
+    color: '#d4af37',
+    fontSize: 34,
     fontWeight: '700',
-    marginBottom: 8,
+    textAlign: 'center',
+    marginBottom: 10,
   },
   subtitle: {
-    color: '#334155',
-    fontSize: 15,
+    color: '#eef3f1',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  badge: {
+    borderWidth: 1,
+    borderColor: '#b8932f',
+    backgroundColor: '#0d342c',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  badgeText: {
+    color: '#dbe8e4',
+    textAlign: 'center',
+    fontSize: 14,
+    letterSpacing: 0.2,
   },
 });

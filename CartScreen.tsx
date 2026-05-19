@@ -1,36 +1,46 @@
+import { ReactElement } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StyleSheet, Text, View } from 'react-native';
 
-export function CartScreen() {
+export function CartScreen(): ReactElement {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Cart</Text>
-      <Text style={styles.subtitle}>Your cart is empty.</Text>
-      <Text style={styles.note}>Add to Cart is coming soon for Bettavaro marketplace listings.</Text>
-    </View>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Your Cart</Text>
+        <Text style={styles.emptyText}>No items yet</Text>
+        <Text style={styles.supportingText}>Curated luxury pieces added to your cart will appear here.</Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: '#F8FAF9',
+  safeArea: {
     flex: 1,
+    backgroundColor: '#061f1b',
+  },
+  container: {
+    flex: 1,
+    alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    paddingHorizontal: 28,
   },
   title: {
-    color: '#0F172A',
-    fontSize: 24,
+    color: '#d4af37',
+    fontSize: 32,
     fontWeight: '700',
     marginBottom: 8,
   },
-  subtitle: {
-    color: '#334155',
-    fontSize: 16,
+  emptyText: {
+    color: '#f2f6f5',
+    fontSize: 20,
     fontWeight: '600',
-    marginBottom: 6,
+    marginBottom: 10,
   },
-  note: {
-    color: '#64748B',
-    fontSize: 14,
+  supportingText: {
+    color: '#c6d7d3',
+    textAlign: 'center',
+    fontSize: 15,
+    lineHeight: 22,
   },
 });
