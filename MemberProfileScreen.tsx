@@ -18,7 +18,12 @@ type MemberProfileData = {
 
 type MeResponse = {
   ok?: boolean;
-  data?: MemberProfileData;
+  data?:
+    | MemberProfileData
+    | {
+        user?: MemberProfileData;
+        profile?: MemberProfileData;
+      };
   user?: MemberProfileData;
   message?: string;
   error?: {
@@ -57,7 +62,12 @@ export function MemberProfileScreen({ token, onBack }: MemberProfileScreenProps)
           return;
         }
 
-        const profileData = result.data ?? result.user ?? null;
+        const profileData =
+          result.data?.user ??
+          result.data?.profile ??
+          result.data ??
+          result.user ??
+          null;
 
         if (!profileData) {
           setErrorMessage('Member profile data is unavailable.');
