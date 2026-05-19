@@ -3,11 +3,13 @@ import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'reac
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export function AccountScreen(): ReactElement {
-  const isLoggedIn = false;
   const [mode, setMode] = useState<'account' | 'login' | 'register'>('account');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
+  const [loading, setLoading] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ email?: string } | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
   const handleLoginPress = (): void => {
     setMode('login');
   };
@@ -17,11 +19,52 @@ export function AccountScreen(): ReactElement {
   };
 
   const handleLogout = (): void => {
+    setAuthToken(null);
+    setCurrentUser(null);
     Alert.alert('Logout', 'Logout pressed');
   };
 
-  const handleLoginSubmit = (): void => {
-    Alert.alert('Login', 'API connection will be added next.');
+ const handleLoginSubmit = async (): Promise<void> => {
+    if (!email.trim() || !password.trim()) {
+      setErrorMessage('Email and password are required.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+
+    try {
+      const response = await fetch('https://bettavaro.com/api/mobile/v1/login.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const result: {
+        ok?: boolean;
+        data?: {
+          token?: string;
+          user?: { email?: string };
+        };
+        error?: { message?: string };
+        message?: string;
+      } = await response.json();
+
+      if (response.ok && result.ok && result.data?.token && result.data?.user) {
+        setAuthToken(result.data.token);
+        setCurrentUser(result.data.user);
+        setMode('account');
+        Alert.alert('Login successful');
+      } else {
+        setErrorMessage(result.error?.message ?? result.message ?? 'Login failed.');
+      }
+    } catch {
+      setErrorMessage('Login failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,18 +88,25 @@ export function AccountScreen(): ReactElement {
               autoCapitalize="none"
             />
 
-            <TextInput
+             <TextInput
               style={styles.input}
               placeholder="Password"
               placeholderTextColor="#b8ccc5"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-            />
+             />
 
-            <TouchableOpacity style={styles.largeLoginButton} onPress={handleLoginSubmit} activeOpacity={0.85}>
-              <Text style={styles.primaryButtonText}>Login</Text>
-            </TouchableOpacity>
+            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+
+            <TouchableOpacity
+              style={[styles.largeLoginButton, loading && styles.disabledButton]}
+              onPress={handleLoginSubmit}
+              activeOpacity={0.85}
+              disabled={loading}
+            >
+              <Text style={styles.primaryButtonText}>{loading ? 'Signing in...' : 'Login'}</Text>
+            </TouchableOpacity> 
 
             <TouchableOpacity onPress={() => setMode('register')} activeOpacity={0.85} style={styles.createAccountLink}>
               <Text style={styles.createAccountText}>Create Account</Text>
@@ -78,8 +128,8 @@ export function AccountScreen(): ReactElement {
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Authentication</Text>
 
-              {!isLoggedIn ? (
-                <View style={styles.authButtonsWrapper}>
+               {!currentUser || !authToken ? (
+                <View style={styles.authButtonsWrapper}> 
                   <TouchableOpacity style={styles.primaryButton} onPress={handleLoginPress} activeOpacity={0.85}>
                     <Text style={styles.primaryButtonText}>Login</Text>
                   </TouchableOpacity>
@@ -91,9 +141,10 @@ export function AccountScreen(): ReactElement {
               ) : (
                 <View style={styles.loggedInContainer}>
                   <Text style={styles.loggedInText}>Welcome back</Text>
+                  <Text style={styles.cardItem}>{currentUser.email ?? email}</Text>
                   <TouchableOpacity style={styles.primaryButton} onPress={handleLogout} activeOpacity={0.85}>
                     <Text style={styles.primaryButtonText}>Logout</Text>
-                  </TouchableOpacity>
+                  </TouchableOpacity> 
                 </View>
               )}
             </View>
@@ -228,10 +279,18 @@ const styles = StyleSheet.create({
     marginTop: 14,
     alignItems: 'center',
   },
-  createAccountText: {
+ createAccountText: { 
     color: '#f6e6b4',
     fontSize: 15,
     fontWeight: '700',
     textDecorationLine: 'underline',
+ },
+  errorText: {
+    color: '#ffb3b3',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
 });
