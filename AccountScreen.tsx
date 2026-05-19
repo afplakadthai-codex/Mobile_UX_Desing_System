@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,6 +15,14 @@ import {
 import { useAuth } from '../../features/auth/AuthContext';
 
 type AuthView = 'guest' | 'signin' | 'register';
+type AppNavigation = NavigationProp<Record<string, object | undefined>>;
+
+type DashboardItem = {
+  key: string;
+  label: string;
+  icon: string;
+  routeCandidates: string[];
+};
 
 type LuxuryInputProps = {
   label: string;
@@ -54,32 +63,9 @@ function LuxuryInput({
   );
 }
 
-type LuxuryButtonProps = {
-  label: string;
-  onPress: () => void;
-  variant?: 'primary' | 'secondary';
-  disabled?: boolean;
-};
-
-function LuxuryButton({ label, onPress, variant = 'primary', disabled }: LuxuryButtonProps) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.button,
-        variant === 'primary' ? styles.buttonPrimary : styles.buttonSecondary,
-        disabled ? styles.buttonDisabled : null,
-        pressed ? styles.buttonPressed : null,
-      ]}
-    >
-      <Text style={variant === 'primary' ? styles.buttonPrimaryText : styles.buttonSecondaryText}>{label}</Text>
-    </Pressable>
-  );
-}
-
 export function AccountScreen() {
   const { isAuthenticated, logout, status, user, login, register } = useAuth();
+  const navigation = useNavigation<AppNavigation>();
 
   const [view, setView] = useState<AuthView>('guest');
   const [email, setEmail] = useState('');
@@ -91,12 +77,48 @@ export function AccountScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const roleLabel = useMemo(() => {
-    if (!user?.role) return 'Member';
-    return String(user.role).charAt(0).toUpperCase() + String(user.role).slice(1);
+  const roleAccessLabel = useMemo(() => {
+    const normalizedRole = String(user?.role ?? 'user').toLowerCase();
+    if (normalizedRole === 'seller') return 'Seller Access';
+    if (normalizedRole === 'admin') return 'Admin Access';
+    return 'Member Access';
   }, [user?.role]);
 
+  const normalizedRole = String(user?.role ?? 'user').toLowerCase();
+  const hasSellerAccess = normalizedRole === 'seller' || normalizedRole === 'admin';
+
+  const commonItems: DashboardItem[] = [
+    { key: 'profile', label: 'Profile', icon: '◆', routeCandidates: ['Profile'] },
+    { key: 'orders', label: 'My Orders', icon: '◆', routeCandidates: ['Orders', 'MyOrders', 'BuyerOrders'] },
+    { key: 'refunds', label: 'Refund Requests', icon: '◆', routeCandidates: ['Refunds', 'MyRefunds'] },
+    { key: 'notifications', label: 'Notifications', icon: '◆', routeCandidates: ['Notifications'] },
+  ];
+
+  const sellerItems: DashboardItem[] = [
+    { key: 'seller-dashboard', label: 'Seller Dashboard', icon: '◆', routeCandidates: ['SellerDashboard'] },
+    { key: 'seller-orders', label: 'Seller Orders', icon: '◆', routeCandidates: ['SellerOrders'] },
+    { key: 'refund-queue', label: 'Refund Queue', icon: '◆', routeCandidates: ['SellerRefunds'] },
+    { key: 'balance', label: 'Balance / Payout', icon: '◆', routeCandidates: ['SellerBalance'] },
+    { key: 'listings', label: 'My Listings', icon: '◆', routeCandidates: ['SellerListings'] },
+  ];
+
+  const dashboardItems = hasSellerAccess ? [...commonItems, ...sellerItems] : commonItems;
+
   const isLoading = status === 'loading';
+
+  const resolveRoute = (candidates: string[]) => {
+    const routeNames = navigation.getState().routeNames;
+    return candidates.find((name) => routeNames.includes(name));
+  };
+
+  const handleDashboardPress = (item: DashboardItem) => {
+    const targetRoute = resolveRoute(item.routeCandidates);
+    if (targetRoute) {
+      navigation.navigate(targetRoute as never);
+      return;
+    }
+    console.warn(`[AccountScreen] Route not registered for "${item.label}". Candidates: ${item.routeCandidates.join(', ')}`);
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -163,20 +185,40 @@ export function AccountScreen() {
           <Text style={styles.heroTitle}>Bettavaro Account</Text>
           <Text style={styles.heroSubtitle}>Welcome back{user?.first_name ? `, ${user.first_name}` : ''}.</Text>
           <View style={styles.goldLine} />
-          <Text style={styles.memberMeta}>{roleLabel} Access</Text>
+          <Text style={styles.memberMeta}>{roleAccessLabel}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Account Actions</Text>
-          <LuxuryButton label="Profile" onPress={() => {}} />
-          <View style={styles.spacer} />
-          <LuxuryButton
-            label="Logout"
-            variant="secondary"
+          <Text style={styles.cardTitle}>Member Center</Text>
+          <View style={styles.menuGrid}>
+            {dashboardItems.map((item) => {
+              const routeExists = Boolean(resolveRoute(item.routeCandidates));
+              return (
+                <Pressable
+                  key={item.key}
+                  style={({ pressed }) => [styles.menuCard, pressed ? styles.menuCardPressed : null]}
+                  onPress={() => handleDashboardPress(item)}
+                >
+                  <View style={styles.menuHeaderRow}>
+                    <Text style={styles.menuIcon}>{item.icon}</Text>
+                    <Text style={styles.menuLabel}>{item.label}</Text>
+                  </View>
+                  <Text style={routeExists ? styles.menuHint : styles.menuHintDisabled}>
+                    {routeExists ? 'Open' : 'Coming soon'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Pressable
             onPress={() => {
               void logout();
             }}
-          />
+            style={({ pressed }) => [styles.logoutButton, pressed ? styles.buttonPressed : null]}
+          >
+            <Text style={styles.logoutText}>Logout</Text>
+          </Pressable>
         </View>
       </ScrollView>
     );
@@ -205,9 +247,16 @@ export function AccountScreen() {
 
         {view === 'guest' && (
           <>
-            <LuxuryButton label="◆ Sign In" onPress={() => setView('signin')} />
+            <Pressable onPress={() => setView('signin')} style={({ pressed }) => [styles.button, styles.buttonPrimary, pressed ? styles.buttonPressed : null]}>
+              <Text style={styles.buttonPrimaryText}>◆ Sign In</Text>
+            </Pressable>
             <View style={styles.spacer} />
-            <LuxuryButton label="◇ Create Account" variant="secondary" onPress={() => setView('register')} />
+            <Pressable
+              onPress={() => setView('register')}
+              style={({ pressed }) => [styles.button, styles.buttonSecondary, pressed ? styles.buttonPressed : null]}
+            >
+              <Text style={styles.buttonSecondaryText}>◇ Create Account</Text>
+            </Pressable>
 
             <View style={styles.featuresGrid}>
               {['Rare Betta Fish', 'Live Auctions', 'Secure Offers', 'Trusted Sellers'].map((feature) => (
@@ -254,9 +303,21 @@ export function AccountScreen() {
                   secureTextEntry
                 />
                 <Text style={styles.helper}>Forgot password support is coming soon.</Text>
-                <LuxuryButton label={isSubmitting ? 'Signing In…' : 'Sign In'} onPress={() => void handleLogin()} disabled={isSubmitting} />
+                <Pressable
+                  onPress={() => void handleLogin()}
+                  disabled={isSubmitting}
+                  style={({ pressed }) => [styles.button, styles.buttonPrimary, isSubmitting ? styles.buttonDisabled : null, pressed ? styles.buttonPressed : null]}
+                >
+                  <Text style={styles.buttonPrimaryText}>{isSubmitting ? 'Signing In…' : 'Sign In'}</Text>
+                </Pressable>
                 <View style={styles.spacer} />
-                <LuxuryButton label="Back to Marketplace" variant="secondary" onPress={() => setView('guest')} disabled={isSubmitting} />
+                <Pressable
+                  onPress={() => setView('guest')}
+                  disabled={isSubmitting}
+                  style={({ pressed }) => [styles.button, styles.buttonSecondary, isSubmitting ? styles.buttonDisabled : null, pressed ? styles.buttonPressed : null]}
+                >
+                  <Text style={styles.buttonSecondaryText}>Back to Marketplace</Text>
+                </Pressable>
               </>
             ) : (
               <>
@@ -290,14 +351,21 @@ export function AccountScreen() {
                   secureTextEntry
                 />
                 <Text style={styles.helper}>Start as a member. You can upgrade to seller later.</Text>
-                <LuxuryButton label={isSubmitting ? 'Creating…' : 'Create Account'} onPress={() => void handleRegister()} disabled={isSubmitting} />
+                <Pressable
+                  onPress={() => void handleRegister()}
+                  disabled={isSubmitting}
+                  style={({ pressed }) => [styles.button, styles.buttonPrimary, isSubmitting ? styles.buttonDisabled : null, pressed ? styles.buttonPressed : null]}
+                >
+                  <Text style={styles.buttonPrimaryText}>{isSubmitting ? 'Creating…' : 'Create Account'}</Text>
+                </Pressable>
                 <View style={styles.spacer} />
-                <LuxuryButton
-                  label="Already have an account? Sign In"
-                  variant="secondary"
+                <Pressable
                   onPress={() => setView('signin')}
                   disabled={isSubmitting}
-                />
+                  style={({ pressed }) => [styles.button, styles.buttonSecondary, isSubmitting ? styles.buttonDisabled : null, pressed ? styles.buttonPressed : null]}
+                >
+                  <Text style={styles.buttonSecondaryText}>Already have an account? Sign In</Text>
+                </Pressable>
               </>
             )}
           </View>
@@ -327,15 +395,15 @@ const styles = StyleSheet.create({
   heroSubtitle: { color: '#D9E4DF', fontSize: 16, marginTop: 6 },
   heroDescription: { color: '#E2E8F0', fontSize: 14, lineHeight: 20, marginTop: 10 },
   goldLine: { backgroundColor: '#D6A84F', borderRadius: 12, height: 3, marginTop: 14, width: 56 },
-  memberMeta: { color: '#E2E8F0', fontSize: 13, marginTop: 10 },
+  memberMeta: { color: '#E2E8F0', fontSize: 13, marginTop: 10, fontWeight: '600' },
   card: {
     backgroundColor: '#FFFFFF',
     borderColor: 'rgba(15, 23, 42, 0.08)',
-    borderRadius: 22,
+    borderRadius: 24,
     borderWidth: 1,
     padding: 16,
   },
-  cardTitle: { color: '#0F172A', fontSize: 18, fontWeight: '700', marginBottom: 12 },
+  cardTitle: { color: '#0F172A', fontSize: 19, fontWeight: '700', marginBottom: 12 },
   button: {
     alignItems: 'center',
     borderRadius: 20,
@@ -343,13 +411,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 16,
   },
-  buttonPrimary: { backgroundColor: '#007A55' },
+  buttonPrimary: { backgroundColor: '#008A63' },
   buttonSecondary: { backgroundColor: '#ECF3EF', borderColor: 'rgba(15, 23, 42, 0.08)', borderWidth: 1 },
   buttonPrimaryText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   buttonSecondaryText: { color: '#0F172A', fontSize: 16, fontWeight: '700' },
   buttonDisabled: { opacity: 0.7 },
   buttonPressed: { opacity: 0.85 },
   spacer: { height: 10 },
+  menuGrid: { gap: 12 },
+  menuCard: {
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0, 138, 99, 0.18)',
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  menuCardPressed: { opacity: 0.82 },
+  menuHeaderRow: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  menuIcon: { color: '#008A63', fontSize: 12, fontWeight: '700' },
+  menuLabel: { color: '#0F172A', fontSize: 16, fontWeight: '600' },
+  menuHint: { color: '#D6A84F', fontSize: 12, fontWeight: '600', marginTop: 5 },
+  menuHintDisabled: { color: '#94A3B8', fontSize: 12, fontWeight: '600', marginTop: 5 },
+  logoutButton: {
+    alignItems: 'center',
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
+    borderRadius: 20,
+    borderWidth: 1,
+    justifyContent: 'center',
+    marginTop: 18,
+    minHeight: 52,
+    paddingHorizontal: 14,
+  },
+  logoutText: { color: '#9A3412', fontSize: 16, fontWeight: '700' },
   featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
   featureTile: {
     backgroundColor: '#FFFFFF',
