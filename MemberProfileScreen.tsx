@@ -16,20 +16,40 @@ type MemberProfileData = {
   account_status?: string;
 };
 
-type MeResponse = {
+type MemberProfileResponseData =
+  | MemberProfileData
+  | {
+      user?: MemberProfileData;
+      profile?: MemberProfileData;
+    };
+
+type MemberProfileResponse = {
   ok?: boolean;
-  data?:
-    | MemberProfileData
-    | {
-        user?: MemberProfileData;
-        profile?: MemberProfileData;
-      };
+  data?: MemberProfileResponseData;
   user?: MemberProfileData;
-  message?: string;
   error?: {
+    code?: string;
     message?: string;
   };
 };
+
+function extractProfile(result: MemberProfileResponse): MemberProfileData | null {
+  const data = result.data;
+
+  if (data && typeof data === 'object') {
+    if ('user' in data && data.user) {
+      return data.user;
+    }
+
+    if ('profile' in data && data.profile) {
+      return data.profile;
+    }
+
+    return data as MemberProfileData;
+  }
+
+  return result.user ?? null;
+}
 
 export function MemberProfileScreen({ token, onBack }: MemberProfileScreenProps): ReactElement {
   const [loading, setLoading] = useState(true);
@@ -51,24 +71,19 @@ export function MemberProfileScreen({ token, onBack }: MemberProfileScreenProps)
           },
         });
 
-        const result: MeResponse = await response.json();
+         const result: MemberProfileResponse = await response.json();
 
         if (!isMounted) {
           return;
         }
 
-        if (!response.ok) {
-          setErrorMessage(result.error?.message ?? result.message ?? 'Failed to load member profile.');
+         if (!response.ok) {
+          setErrorMessage(result.error?.message ?? 'Failed to load member profile.');
           return;
         }
 
-        const profileData =
-          result.data?.user ??
-          result.data?.profile ??
-          result.data ??
-          result.user ??
-          null;
-
+        const profileData = extractProfile(result);
+		
         if (!profileData) {
           setErrorMessage('Member profile data is unavailable.');
           return;
