@@ -2,13 +2,22 @@ import { ReactElement, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+type UserRole = 'user' | 'seller' | 'admin';
+
+type CurrentUser = {
+  email?: string;
+  name?: string;
+  role?: string;
+  capabilities?: string[];
+};
+
 export function AccountScreen(): ReactElement {
   const [mode, setMode] = useState<'account' | 'login' | 'register'>('account');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [currentUser, setCurrentUser] = useState<{ email?: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const handleLoginPress = (): void => {
     setMode('login');
@@ -22,6 +31,32 @@ export function AccountScreen(): ReactElement {
     setAuthToken(null);
     setCurrentUser(null);
     Alert.alert('Logout', 'Logout pressed');
+};
+
+  const getRoleLabel = (user: CurrentUser | null): UserRole => {
+    const normalizedRole = user?.role?.toLowerCase();
+    if (normalizedRole === 'admin' || normalizedRole === 'seller' || normalizedRole === 'user') {
+      return normalizedRole;
+    }
+
+    return 'user';
+  };
+
+  const hasSellerAccess = (user: CurrentUser | null): boolean => {
+    if (!user) {
+      return false;
+    }
+
+    const role = getRoleLabel(user);
+    if (role === 'seller' || role === 'admin') {
+      return true;
+    }
+
+    return (user.capabilities ?? []).some((capability) => capability.toLowerCase().includes('seller'));
+  };
+
+  const handleComingNext = (feature: string): void => {
+    Alert.alert('Coming next', `${feature} will be available soon.`);
   };
 
  const handleLoginSubmit = async (): Promise<void> => {
@@ -125,8 +160,8 @@ export function AccountScreen(): ReactElement {
             <Text style={styles.title}>Bettavaro Account</Text>
             <Text style={styles.subtitle}>Manage your luxury buying and selling experience.</Text>
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Authentication</Text>
+          <View style={styles.card}>
+              <Text style={styles.cardTitle}>Authentication</Text> 
 
                {!currentUser || !authToken ? (
                 <View style={styles.authButtonsWrapper}> 
@@ -138,10 +173,11 @@ export function AccountScreen(): ReactElement {
                     <Text style={styles.secondaryButtonText}>Register</Text>
                   </TouchableOpacity>
                 </View>
-              ) : (
+               ) : (
                 <View style={styles.loggedInContainer}>
-                  <Text style={styles.loggedInText}>Welcome back</Text>
-                  <Text style={styles.cardItem}>{currentUser.email ?? email}</Text>
+                  <Text style={styles.loggedInText}>Account Session Active</Text>
+                  <Text style={styles.cardItem}>Welcome back, {currentUser.name ?? currentUser.email ?? email}</Text>
+                  <Text style={styles.cardItem}>Role: {getRoleLabel(currentUser)}</Text>
                   <TouchableOpacity style={styles.primaryButton} onPress={handleLogout} activeOpacity={0.85}>
                     <Text style={styles.primaryButtonText}>Logout</Text>
                   </TouchableOpacity> 
@@ -149,22 +185,37 @@ export function AccountScreen(): ReactElement {
               )}
             </View>
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Account Actions</Text>
-              <Text style={styles.cardItem}>• Profile & Verification</Text>
-              <Text style={styles.cardItem}>• Saved Listings</Text>
-              <Text style={styles.cardItem}>• Security & Privacy</Text>
-            </View>
+            {currentUser && authToken ? (
+              <>
+                <View style={styles.card}>
+                  <Text style={styles.cardTitle}>Account Actions</Text>
+                  <TouchableOpacity style={styles.actionRow} onPress={() => handleComingNext('Member dashboard')} activeOpacity={0.85}>
+                    <Text style={styles.actionText}>Open Member Dashboard</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.actionRow} onPress={() => handleComingNext('Change password')} activeOpacity={0.85}>
+                    <Text style={styles.actionText}>Change Password</Text>
+                  </TouchableOpacity>
+                </View>
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Seller / Marketplace</Text>
-              <Text style={styles.cardItem}>• My Orders</Text>
-              <Text style={styles.cardItem}>• My Offers</Text>
-              <Text style={styles.cardItem}>• Seller Center</Text>
-            </View>
+                {hasSellerAccess(currentUser) ? (
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Seller / Marketplace</Text>
+                    <TouchableOpacity style={styles.actionRow} onPress={() => handleComingNext('Seller dashboard')} activeOpacity={0.85}>
+                      <Text style={styles.actionText}>Open Seller Dashboard</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionRow} onPress={() => handleComingNext('Orders')} activeOpacity={0.85}>
+                      <Text style={styles.actionText}>My Orders</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionRow} onPress={() => handleComingNext('Offers')} activeOpacity={0.85}>
+                      <Text style={styles.actionText}>My Offers</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </>
+            ) : null}
           </>
         )}
-      </View>
+      </View> 
     </SafeAreaView>
   );
 }
@@ -290,7 +341,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
   },
-  disabledButton: {
+ disabledButton: {
     opacity: 0.7,
+  },
+  actionRow: {
+    backgroundColor: '#12463d',
+    borderColor: '#d4af37',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+  },
+  actionText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
