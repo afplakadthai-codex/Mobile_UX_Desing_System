@@ -1,12 +1,29 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import type { ReactElement } from 'react';
+import { Text } from 'react-native';
 
-import { AccountScreen } from '../screens/AccountScreen';
-import { CartScreen } from '../screens/CartScreen';
 import { HomeScreen } from '../screens/HomeScreen';
-import { ListingDetailScreen } from '../screens/ListingDetailScreen';
-import { OffersScreen } from '../screens/OffersScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
+
+function ListingDetailScreen(): ReactElement | null {
+  return null;
+}
+
+function AccountScreen(): ReactElement | null {
+  return null;
+}
+
+function CartScreen(): ReactElement | null {
+  return null;
+}
+
+function OffersScreen(): ReactElement | null {
+  return null;
+}
+
+function ProfileScreen(): ReactElement | null {
+  return null;
+}
 
 export type HomeStackParamList = {
   Home: undefined;
@@ -74,12 +91,42 @@ export function MainTabs() {
       screenOptions={{
         headerShown: false,
       }}
-    >
-      <Tab.Screen component={HomeStackNavigator} name="Home" />
-      <Tab.Screen component={SearchScreen} name="Search" />
-      <Tab.Screen component={CartScreen} name="Cart" />
-      <Tab.Screen component={OffersScreen} name="Offers" />
-      <Tab.Screen component={AccountStackNavigator} name="Account" />
+   >
+      <Tab.Screen
+        component={HomeStackNavigator}
+        name="Home"
+        options={{
+          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>⌂</Text>,
+        }}
+      />
+      <Tab.Screen
+        component={SearchScreen}
+        name="Search"
+        options={{
+          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>⌕</Text>,
+        }}
+      />
+      <Tab.Screen
+        component={CartScreen}
+        name="Cart"
+        options={{
+          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>🛒</Text>,
+        }}
+      />
+      <Tab.Screen
+        component={OffersScreen}
+        name="Offers"
+        options={{
+          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>◇</Text>,
+        }}
+      />
+      <Tab.Screen
+        component={AccountStackNavigator}
+        name="Account"
+        options={{
+          tabBarIcon: ({ color, size }) => <Text style={{ color, fontSize: size }}>●</Text>,
+        }}
+      />
     </Tab.Navigator>
   );
-}
+} 

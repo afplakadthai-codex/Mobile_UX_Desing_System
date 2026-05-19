@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Image,
   Linking,
@@ -13,9 +12,20 @@ import {
 
 import { fetchListingDetail } from '../services/api/marketplace';
 import { colors, radii, shadows, spacing } from '../theme/tokens';
-import type { RootStackParamList } from '../navigation/AppNavigator';
+type ListingDetailScreenParams = {
+  listing?: unknown;
+  listingId?: string | number;
+};
 
-type ListingDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ListingDetail'>;
+type ListingDetailScreenProps = {
+  navigation: {
+    goBack: () => void;
+  };
+  route?: {
+    params?: ListingDetailScreenParams;
+  };
+};
+
 
 type ListingRecord = Record<string, unknown>;
 
@@ -139,6 +149,10 @@ const isVideoUrl = (url: unknown): boolean => {
 
   return /\.(m3u8|mov|mp4|m4v|webm)(?:[?#].*)?$/i.test(mediaUrl);
 };
+
+const isVideoMedia = (item?: ListingMediaItem | null): boolean =>
+  Boolean(item && (item.type === 'video' || isVideoUrl(item.url)));
+
 
 const getMediaString = (value: unknown, keys: string[]): string | null => {
   if (hasText(value)) {
@@ -411,20 +425,21 @@ const formatListingPrice = (listing: ListingRecord, currency: string) => {
 
 
 export function ListingDetailScreen({ navigation, route }: ListingDetailScreenProps) {
+  const routeParams = route?.params ?? {};
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [failedMediaUrls, setFailedMediaUrls] = useState<Record<string, boolean>>({});
   const [fullListing, setFullListing] = useState<ListingRecord | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const fallbackListing: ListingRecord = useMemo(
-    () => (isRecord(route.params.listing) ? route.params.listing : {}),
-    [route.params.listing],
+    () => (isRecord(routeParams.listing) ? routeParams.listing : {}),
+    [routeParams.listing],
   );
   const listing: ListingRecord = useMemo(
     () => ({ ...fallbackListing, ...(fullListing ?? {}) }),
     [fallbackListing, fullListing],
   );
-  const listingId = route.params.listingId;
+  const listingId = routeParams.listingId;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -433,7 +448,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
     setLoadingDetail(true);
     setDetailError(null);
 
-    fetchListingDetail(listingId, controller.signal)
+    fetchListingDetail(String(listingId), controller.signal)
       .then((detail: ListingRecord) => {
         setFullListing(detail);
       })
@@ -457,6 +472,7 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
   const mediaKey = mediaItems.map((item: ListingMediaItem) => item.url).join('|');
   const selectedMedia = mediaItems[selectedMediaIndex] ?? mediaItems[0];
   const selectedMediaFailed = selectedMedia ? failedMediaUrls[selectedMedia.url] : false;
+   const selectedMediaIsVideo = isVideoMedia(selectedMedia); 
 
   useEffect(() => {
     setSelectedMediaIndex(0);
@@ -517,39 +533,43 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scrollContent} style={styles.container}>
         <View style={styles.imageFrame}>
-         {selectedMedia?.type === 'image' && !selectedMediaFailed ? (
+          {selectedMedia && !selectedMediaIsVideo && !selectedMediaFailed ? (
             <Image
               accessibilityIgnoresInvertColors
               resizeMode="cover"
-             resizeMethod="resize"
+              resizeMethod="resize"
               fadeDuration={150}
-            source={{ uri: getOptimizedImageUrl(selectedMedia.url, 1000) ?? selectedMedia.url }}
+              source={{ uri: getOptimizedImageUrl(selectedMedia.url, 1000) ?? selectedMedia.url }}
               style={styles.image}
-            onError={() => setFailedMediaUrls((current: Record<string, boolean>) => ({ ...current, [selectedMedia.url]: true }))}
+              onError={() => setFailedMediaUrls((current: Record<string, boolean>) => ({ ...current, [selectedMedia.url]: true }))}
             />
-  ) : selectedMedia?.type === 'video' ? (
-            <View style={styles.videoPreview}>
-              {hasText(selectedMedia.thumbnail) ? (
-                <Image
-                  accessibilityIgnoresInvertColors
-                  resizeMode="cover"
-                  resizeMethod="resize"
-                  source={{ uri: getOptimizedImageUrl(selectedMedia.thumbnail, 1000) ?? selectedMedia.thumbnail }}
-                  style={styles.videoThumbnail}
-                />
-              ) : null}
-              <View style={styles.videoOverlay}>
-                <Text style={styles.videoLabel}>Video Clip</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  style={styles.videoButton}
-                  onPress={() => Linking.openURL(selectedMedia.url)}
-                >
-                  <Text style={styles.videoButtonText}>Play / Open</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : (
+) : selectedMedia && selectedMediaIsVideo ? (
+  <Pressable
+    accessibilityLabel="Tap to play video"
+    accessibilityRole="button"
+    onPress={() => Linking.openURL(selectedMedia.url)}
+    style={styles.videoPreview}
+  >
+    {hasText(selectedMedia.thumbnail) ? (
+      <Image
+        accessibilityIgnoresInvertColors
+        resizeMode="cover"
+        resizeMethod="resize"
+        source={{
+          uri: getOptimizedImageUrl(selectedMedia.thumbnail, 1000) ?? selectedMedia.thumbnail,
+        }}
+        style={styles.videoThumbnail}
+      />
+    ) : null}
+
+    <View style={styles.videoOverlay}>
+      <Text style={styles.videoLabel}>Video Clip</Text>
+      <View style={styles.videoButton}>
+        <Text style={styles.videoButtonText}>Tap to play video</Text>
+      </View>
+    </View>
+  </Pressable>
+) : (
             <View style={styles.imageFallback}>
               <Text style={styles.imageFallbackText}>Bettavaro</Text>
             </View>
@@ -576,16 +596,17 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
             {mediaItems.map((item: ListingMediaItem, index: number) => {
               const thumbnailUrl = item.thumbnail ?? item.url;
               const isSelected = item.url === selectedMedia?.url;
+              const itemIsVideo = isVideoMedia(item);			  
 
               return (
                 <Pressable
-                  accessibilityLabel={`${item.type === 'video' ? 'Video Clip' : 'Listing image'} ${index + 1}`}
+                  accessibilityLabel={`${itemIsVideo ? 'Video' : 'Listing image'} ${index + 1}`}
                   accessibilityRole="button"
                   key={`${item.type}-${item.url}`}
                   onPress={() => setSelectedMediaIndex(index)}
                   style={[styles.thumbnailButton, isSelected ? styles.thumbnailButtonSelected : null]}
                 >
-                  {item.type === 'image' || hasText(item.thumbnail) ? (
+                 {!itemIsVideo || hasText(item.thumbnail) ? ( 
                     <Image
                       accessibilityIgnoresInvertColors
                       resizeMode="cover"
@@ -598,9 +619,9 @@ export function ListingDetailScreen({ navigation, route }: ListingDetailScreenPr
                       <Text style={styles.thumbnailVideoIcon}>▶</Text>
                     </View>
                   )}
-                  {item.type === 'video' ? (
+                  {itemIsVideo ? (
                     <View style={styles.thumbnailVideoBadge}>
-                      <Text style={styles.thumbnailVideoBadgeText}>Video Clip</Text>
+                      <Text style={styles.thumbnailVideoBadgeText}>▶ VIDEO</Text>
                     </View>
                   ) : null}
                 </Pressable>
@@ -721,7 +742,7 @@ const styles = StyleSheet.create({
 
 
   videoPreview: {
-    backgroundColor: colors.brand.emerald950,
+    backgroundColor: '#000',
     flex: 1,
   },
   videoThumbnail: {
@@ -732,25 +753,41 @@ const styles = StyleSheet.create({
   videoOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
-    backgroundColor: 'rgba(2, 44, 34, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'center',
     padding: spacing[5],
   },
+  videoPlayButton: {
+    alignItems: 'center',
+    backgroundColor: colors.accent.gold600,
+    borderRadius: 32,
+    height: 64,
+    justifyContent: 'center',
+    marginBottom: spacing[3],
+    width: 64,
+  },
+  videoPlayIcon: { 
+    color: colors.brand.emerald950,
+    fontSize: 26,
+    fontWeight: '800',
+    marginLeft: 3,
+  },
   videoLabel: {
     color: colors.neutral[0],
-    fontSize: 18,
+    fontSize: 18, 
     fontWeight: '800',
-    marginBottom: spacing[3],
   },
   videoButton: {
+    alignItems: 'center',
     backgroundColor: colors.accent.gold600,
     borderRadius: radii.pill,
-    paddingHorizontal: spacing[5],
-    paddingVertical: spacing[3],
+    marginTop: spacing[3],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
   },
   videoButtonText: {
     color: colors.brand.emerald950,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
   },
   thumbnailScroller: {

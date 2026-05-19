@@ -4,7 +4,8 @@ export function CartScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Cart</Text>
-      <Text style={styles.subtitle}>Your selected items will appear here.</Text>
+      <Text style={styles.subtitle}>Your cart is empty.</Text>
+      <Text style={styles.note}>Add to Cart is coming soon for Bettavaro marketplace listings.</Text>
     </View>
   );
 }
@@ -24,6 +25,12 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: '#334155',
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  note: {
+    color: '#64748B',
+    fontSize: 14,
   },
 });

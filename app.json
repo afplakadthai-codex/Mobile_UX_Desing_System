@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "Bettavaro Marketplace",
+    "slug": "bettavaro-marketplace",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#06251D"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
