@@ -383,62 +383,27 @@ try {
         bv_mobile_logout_error('server_error', 'Something went wrong.', 500);
     }
 
-    $columns = bv_mobile_logout_columns($db, 'mobile_auth_tokens');
-    $hasColumn = static fn(string $column): bool => in_array(strtolower($column), $columns, true);
-
-    if ($hasColumn('token_hash')) {
-        $lookupColumn = 'token_hash';
-        $lookupValue = $tokenHash;
-    } elseif ($hasColumn('token')) {
-        $lookupColumn = 'token';
-        $lookupValue = $plainToken;
-    } else {
-        bv_mobile_logout_log('mobile_auth_tokens has no supported token lookup column');
-        bv_mobile_logout_error('server_error', 'Something went wrong.', 500);
-    }
-
-    $tokenRow = bv_mobile_logout_query_row(
+  $tokenRow = bv_mobile_logout_query_row(
         $db,
-        'SELECT id FROM ' . bv_mobile_logout_ident('mobile_auth_tokens') . ' WHERE ' . bv_mobile_logout_ident($lookupColumn) . ' = ? LIMIT 1',
-        [$lookupValue]
+        'SELECT id FROM ' . bv_mobile_logout_ident('mobile_auth_tokens') . ' WHERE ' . bv_mobile_logout_ident('token_hash') . ' = ? LIMIT 1',
+        [$tokenHash]
     );
 
     if (!$tokenRow) {
         bv_mobile_logout_success(false);
     }
 
-    $sets = [];
-    if ($hasColumn('revoked_at')) {
-        $sets[] = 'revoked_at = NOW()';
-    }
-    if ($hasColumn('status')) {
-        $sets[] = 'status = ?';
-    }
-    if ($hasColumn('is_active')) {
-        $sets[] = 'is_active = 0';
-    }
-    if ($hasColumn('updated_at')) {
-        $sets[] = 'updated_at = NOW()';
+    $updated = bv_mobile_logout_execute(
+        $db,
+        'UPDATE ' . bv_mobile_logout_ident('mobile_auth_tokens') . ' SET revoked_at = NOW() WHERE ' . bv_mobile_logout_ident('token_hash') . ' = ? LIMIT 1',
+        [$tokenHash]
+    );
+
+    if (!$updated) {
+        bv_mobile_logout_log('Token revoke update failed');
+        bv_mobile_logout_error('server_error', 'Something went wrong.', 500);
     }
 
-    if ($sets !== []) {
-        $params = [];
-        if ($hasColumn('status')) {
-            $params[] = 'revoked';
-        }
-        $params[] = (int) $tokenRow['id'];
-
-        $updated = bv_mobile_logout_execute(
-            $db,
-            'UPDATE ' . bv_mobile_logout_ident('mobile_auth_tokens') . ' SET ' . implode(', ', $sets) . ' WHERE id = ? LIMIT 1',
-            $params
-        );
-
-        if (!$updated) {
-            bv_mobile_logout_log('Token revoke update failed');
-            bv_mobile_logout_error('server_error', 'Something went wrong.', 500);
-        }
-    }
 
     bv_mobile_logout_success(true);
 } catch (Throwable $e) {
